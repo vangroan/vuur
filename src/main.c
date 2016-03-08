@@ -1,6 +1,8 @@
 
 #include <stdio.h>
 #include "scanner.h"
+#include "lexer.h"
+
 
 void demo_scanner() {
     printf("Scanner Demo\n");
@@ -19,7 +21,24 @@ void demo_scanner() {
     vu_scanner_free(scanner);
 }
 
+
+void demo_lexer() {
+    printf("Lexer Demo\n");
+
+    vu_scanner_t* scanner = vu_scanner_new("4 * 3 + 2 - 1");
+    vu_Lexer_t* lexer = vu_Lexer_new(scanner);
+
+    
+
+    vu_Lexer_free(lexer);
+    vu_scanner_free(scanner);
+
+    printf("Lexer Done\n");
+}
+
+
 int main() {
     demo_scanner();
+    demo_lexer();
     return 0;
 }
