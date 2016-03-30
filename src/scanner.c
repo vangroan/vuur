@@ -2,6 +2,33 @@
 
 #include "scanner.h"
 
+// -------
+// Private
+// -------
+
+static struct VuCharacter
+create_null_character(const int pos, const int line, const int col) {
+    return (struct VuCharacter){
+        '\0', // val
+        pos,
+        line,
+        col,
+        vu_eof
+    };
+}
+
+
+// Mark scanner as done
+static void
+scanner_finish(struct VuScanner* self) {
+    self->done = vu_True;
+}
+
+
+// ------
+// Public
+// ------
+
 struct VuScanner* 
 vu_scanner_new(const char* source) {
     struct VuScanner* self = malloc(sizeof(struct VuScanner));
@@ -21,20 +48,18 @@ vu_scanner_free(struct VuScanner* self) {
 }
 
 
-vu_character_t 
+struct VuCharacter 
 vu_scanner_next(struct VuScanner* self) {
-
-    if (self->position >= self->sourceLength) {
-        self->done = vu_True;
-        vu_character_t null_c;
-        null_c.val = '\0';
-        null_c.kind = vu_eof;
-        return null_c;
-    }
 
     self->position++;
 
-    vu_character_t c;
+    if (self->position >= self->sourceLength) {
+        scanner_finish(self);
+        // Incrementing column to avoid having same column as previous character
+        return create_null_character(self->position, self->line, ++self->column);
+    }
+
+    struct VuCharacter c;
     c.val = self->source[self->position];
 
     if (c.val == '\n') {

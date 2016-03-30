@@ -13,7 +13,7 @@ void demo_scanner() {
     printf("Source: %s\n", scanner->source);
 
     while (vu_scanner_running(scanner)) {
-        vu_character_t c = vu_scanner_next(scanner);
+        struct VuCharacter c = vu_scanner_next(scanner);
         printf("[%d:%d]: %c\n", c.line, c.column, c.val);
     }
 
