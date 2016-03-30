@@ -22,6 +22,13 @@ enum VuTokenKind {
 struct VuToken {
     enum VuTokenKind kind;
 
+    // Position in source
+    int position;
+
+    int line;
+
+    int column;
+
     // Pointer into source where token content starts
     char* content;
 
