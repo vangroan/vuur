@@ -26,11 +26,11 @@ void demo_lexer() {
     printf("Lexer Demo\n");
 
     struct VuScanner* scanner = vu_scanner_new("4 * 3 + 2 - 1");
-    vu_Lexer_t* lexer = vu_Lexer_new(scanner);
+    struct VuLexer* lexer = vu_lexer_new(scanner);
 
     
 
-    vu_Lexer_free(lexer);
+    vu_lexer_free(lexer);
     vu_scanner_free(scanner);
 
     printf("Lexer Done\n");

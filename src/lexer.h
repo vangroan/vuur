@@ -8,14 +8,15 @@
 #include "scanner.h"
 #include "token.h"
 
-typedef struct {
+
+struct VuLexer {
     struct VuScanner* scanner;
     bool done;
-} vu_Lexer_t;
+};
 
 
-vu_Lexer_t* vu_Lexer_new(struct VuScanner* scanner);
-void vu_Lexer_free(vu_Lexer_t* self);
-vu_Token_t* vu_Lexer_scan(vu_Lexer_t* self);
+struct VuLexer* vu_lexer_new(struct VuScanner* scanner);
+void vu_lexer_free(struct VuLexer* self);
+vu_Token_t* vu_lexer_scan(struct VuLexer* self);
 
 #endif
