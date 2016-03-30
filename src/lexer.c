@@ -6,6 +6,31 @@
 // -------
 
 
+static void
+dumpToken(struct VuToken* token) {
+    printf("<Token %d >\n", 
+        token->position);
+}
+
+static void
+dumpCharacter(struct VuCharacter* chr) {
+    char* kind = NULL;
+
+    switch(chr->kind) {
+        case vu_none: kind = "none"; break;
+        case vu_char: kind = "char"; break;
+        case vu_whitespace: kind = "whitespace"; break;
+        case vu_eof: kind = "eof"; break;
+        default: kind = "unknown"; break;
+    }
+
+    printf("<Character %c %d %s >\n", 
+        chr->content == NULL ? ' ' : chr->content[0],
+        chr->position,
+        kind
+    );
+}
+
 static inline void
 init_empty_token(struct VuToken* token) {
     token->kind = TOKEN_NOTOKEN;
@@ -17,8 +42,18 @@ init_empty_token(struct VuToken* token) {
 }
 
 static inline bool
+isNone(const struct VuCharacter* chr) {
+    return chr->kind == vu_none;
+}
+
+static inline bool
 isWhitespace(const char c) {
     return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+}
+
+static inline bool
+isNumber(const char c) {
+    return '0' <= c && c <= '9';
 }
 
 static inline bool
@@ -34,6 +69,12 @@ isEOF(struct VuCharacter* chr) {
 static inline void
 lexer_next_character(struct VuLexer* self) {
     self->character = vu_scanner_next(self->scanner);
+}
+
+static inline void
+lexer_consume(struct VuLexer* self) {
+    self->current->length++;
+    lexer_next_character(self);
 }
 
 static inline char
@@ -52,11 +93,30 @@ lexer_checkEOF(struct VuLexer* self) {
 
 static void
 lexer_readUntilWhitespace(struct VuLexer* self) {
-    // TODO: Set current token pointer
-    while (!isWhitespace(lexer_char(self))) {
-        // TODO: Advance token length
-        lexer_next_character(self);
+    printf("Reading until whitespace\n");
+    while (!isWhitespace(lexer_char(self))
+        && !isNumber(lexer_char(self))
+        && !lexer_checkEOF(self)) {
+        dumpCharacter(&self->character);
+        lexer_consume(self);
     }
+}
+
+
+static void
+lexer_makeToken(struct VuLexer* self) {
+    self->current->kind = TOKEN_NOTOKEN;
+    self->current->position = self->character.position;
+    self->current->line = self->character.line;
+    self->current->column = self->character.column;
+    self->current->content = self->character.content;
+    self->current->length = 0;
+}
+
+
+static void
+lexer_keyword(struct VuLexer* self) {
+    // TODO
 }
 
 
@@ -70,6 +130,8 @@ vu_lexer_new(struct VuScanner* scanner) {
     struct VuLexer* lexer = malloc(sizeof(struct VuLexer));
     
     lexer->scanner = scanner;
+
+    vu_character_init(&lexer->character);
 
     lexer->current = malloc(sizeof(struct VuToken));
     init_empty_token(lexer->current);
@@ -89,15 +151,18 @@ vu_lexer_free(struct VuLexer* self) {
 
 struct VuToken*
 vu_lexer_next(struct VuLexer* self) {
-    lexer_next_character(self);    
-
+    dumpCharacter(&self->character);
     // Ignore leading whitespace
-    while(isWhitespace(lexer_char(self)) && vu_scanner_running(self->scanner)) {
+    while((isWhitespace(lexer_char(self)) || isNone(&self->character))
+        && vu_scanner_running(self->scanner)) {
         lexer_next_character(self);
-    }
+    } 
 
     if (isLetter(lexer_char(self))) {
+        lexer_makeToken(self);
         lexer_readUntilWhitespace(self);
+        dumpToken(self->current);
+        lexer_keyword(self);
     }
 
     return self->current;

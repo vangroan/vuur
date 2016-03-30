@@ -8,6 +8,7 @@
 
 
 enum vu_character_kind {
+    vu_none,
     vu_char,
     vu_whitespace,
     vu_eof
@@ -29,6 +30,7 @@ struct VuCharacter {
     int position;
     int line;
     int column;
+    char* content;
     enum vu_character_kind kind;
 };
 
@@ -37,6 +39,6 @@ struct VuScanner* vu_scanner_new(const char* source);
 void vu_scanner_free(struct VuScanner* self);
 struct VuCharacter vu_scanner_next(struct VuScanner* self);
 bool vu_scanner_running(const struct VuScanner* self);
-
+void vu_character_init(struct VuCharacter* self);
 
 #endif

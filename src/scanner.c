@@ -10,10 +10,11 @@ static inline struct VuCharacter
 create_null_character(const int pos, const int line, const int col) {
     return (struct VuCharacter){
         '\0', // val
-        pos,
-        line,
-        col,
-        vu_eof
+        pos, // position
+        line, // line
+        col, // column
+        NULL, // content
+        vu_eof // done
     };
 }
 
@@ -38,6 +39,12 @@ choose_character_kind(const char chr) {
 static inline void
 scanner_finish(struct VuScanner* self) {
     self->done = true;
+}
+
+
+static inline char*
+getCharacterPointer(const struct VuScanner* self, const int position) {
+    return self->source + position;
 }
 
 
@@ -88,6 +95,7 @@ vu_scanner_next(struct VuScanner* self) {
     c.position = self->position;
     c.line = self->line;
     c.column = self->column;
+    c.content = getCharacterPointer(self, c.position);
     c.kind = choose_character_kind(c.val);    
 
     return c;
@@ -97,4 +105,13 @@ vu_scanner_next(struct VuScanner* self) {
 bool 
 vu_scanner_running(const struct VuScanner* self) {
     return !self->done;
+}
+
+void vu_character_init(struct VuCharacter* self) {
+    self->val = '\0';
+    self->position = 0;
+    self->line = 0;
+    self->column = 0;
+    self->content = NULL;
+    self->kind = vu_none;
 }

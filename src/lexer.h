@@ -4,6 +4,7 @@
 #define VUUR_LEXER
 
 #include <stdbool.h>
+#include <stdio.h>
 
 #include "scanner.h"
 
@@ -14,6 +15,8 @@ enum VuTokenKind {
     TOKEN_MINUS,
 
     TOKEN_NUMLITERAL,
+
+    TOKEN_PROCEDURE,
 
     TOKEN_LINEBREAK
 };

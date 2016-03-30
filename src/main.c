@@ -57,10 +57,7 @@ void demo_lexer() {
     struct VuScanner* scanner = vu_scanner_new(source);
     struct VuLexer* lexer = vu_lexer_new(scanner);
 
-    while (vu_scanner_running(scanner)) {
-        struct VuCharacter c = vu_scanner_next(scanner);
-        printf("[%03d:%03d]: %c\n", c.line, c.column, c.val);
-    }
+    vu_lexer_next(lexer);
 
     vu_lexer_free(lexer);
     vu_scanner_free(scanner);
