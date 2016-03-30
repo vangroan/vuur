@@ -14,14 +14,14 @@ enum vu_character_kind {
 };
 
 
-typedef struct {
+struct VuScanner {
     char* source;
     int sourceLength;
     int position;
     int line;
     int column;
     vu_Bool done;
-} vuScanner;
+};
 
 
 typedef struct {
@@ -33,10 +33,10 @@ typedef struct {
 } vu_character_t;
 
 
-vuScanner* vuScanner_new(const char* source) ;
-void vu_scanner_free(vuScanner* self);
-vu_character_t vu_scanner_next(vuScanner* self);
-vu_Bool vu_scanner_running(vuScanner* self);
+struct VuScanner* vu_scanner_new(const char* source) ;
+void vu_scanner_free(struct VuScanner* self);
+vu_character_t vu_scanner_next(struct VuScanner* self);
+vu_Bool vu_scanner_running(const struct VuScanner* self);
 
 
 #endif
