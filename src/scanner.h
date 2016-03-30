@@ -33,7 +33,7 @@ struct VuCharacter {
 };
 
 
-struct VuScanner* vu_scanner_new(const char* source) ;
+struct VuScanner* vu_scanner_new(const char* source);
 void vu_scanner_free(struct VuScanner* self);
 struct VuCharacter vu_scanner_next(struct VuScanner* self);
 vu_Bool vu_scanner_running(const struct VuScanner* self);
