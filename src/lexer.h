@@ -3,13 +3,14 @@
 #ifndef VUUR_LEXER
 #define VUUR_LEXER
 
+#include <stdbool.h>
+
 #include "scanner.h"
 #include "token.h"
-#include "types.h"
 
 typedef struct {
     struct VuScanner* scanner;
-    vu_Bool done;
+    bool done;
 } vu_Lexer_t;
 
 

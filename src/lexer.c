@@ -5,7 +5,7 @@
 vu_Lexer_t* vu_Lexer_new(struct VuScanner* scanner) {
     vu_Lexer_t* lexer = (vu_Lexer_t*)malloc(sizeof(vu_Lexer_t));
     lexer->scanner = scanner;
-    lexer->done = vu_False;
+    lexer->done = false;
     return lexer;
 }
 

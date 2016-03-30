@@ -2,9 +2,9 @@
 #ifndef VUUR_SCANNER
 #define VUUR_SCANNER
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include "types.h"
 
 
 enum vu_character_kind {
@@ -20,7 +20,7 @@ struct VuScanner {
     int position;
     int line;
     int column;
-    vu_Bool done;
+    bool done;
 };
 
 
@@ -36,7 +36,7 @@ struct VuCharacter {
 struct VuScanner* vu_scanner_new(const char* source);
 void vu_scanner_free(struct VuScanner* self);
 struct VuCharacter vu_scanner_next(struct VuScanner* self);
-vu_Bool vu_scanner_running(const struct VuScanner* self);
+bool vu_scanner_running(const struct VuScanner* self);
 
 
 #endif

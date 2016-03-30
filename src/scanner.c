@@ -21,7 +21,7 @@ create_null_character(const int pos, const int line, const int col) {
 // Mark scanner as done
 static void
 scanner_finish(struct VuScanner* self) {
-    self->done = vu_True;
+    self->done = true;
 }
 
 
@@ -37,7 +37,7 @@ vu_scanner_new(const char* source) {
     self->position = -1;
     self->line = 0;
     self->column = -1;
-    self->done = vu_False;
+    self->done = false;
     return self;
 }
 
@@ -80,7 +80,7 @@ vu_scanner_next(struct VuScanner* self) {
 }
 
 
-vu_Bool 
+bool 
 vu_scanner_running(const struct VuScanner* self) {
     return !self->done;
 }
