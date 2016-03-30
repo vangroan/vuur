@@ -6,7 +6,7 @@
 // Private
 // -------
 
-static struct VuCharacter
+static inline struct VuCharacter
 create_null_character(const int pos, const int line, const int col) {
     return (struct VuCharacter){
         '\0', // val
@@ -34,7 +34,7 @@ choose_character_kind(const char chr) {
 
 
 // Mark scanner as done
-static void
+static inline void
 scanner_finish(struct VuScanner* self) {
     self->done = true;
 }
