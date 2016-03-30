@@ -21,7 +21,7 @@ typedef struct {
     int line;
     int column;
     vu_Bool done;
-} vu_scanner_t;
+} vuScanner;
 
 
 typedef struct {
@@ -33,10 +33,10 @@ typedef struct {
 } vu_character_t;
 
 
-vu_scanner_t* vu_scanner_new(char* source) ;
-void vu_scanner_free(vu_scanner_t* self);
-vu_character_t vu_scanner_next(vu_scanner_t* self);
-vu_Bool vu_scanner_running(vu_scanner_t* self);
+vuScanner* vuScanner_new(char* source) ;
+void vu_scanner_free(vuScanner* self);
+vu_character_t vu_scanner_next(vuScanner* self);
+vu_Bool vu_scanner_running(vuScanner* self);
 
 
 #endif

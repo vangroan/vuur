@@ -7,7 +7,7 @@
 void demo_scanner() {
     printf("Scanner Demo\n");
 
-    vu_scanner_t* scanner = vu_scanner_new("one two\n three");
+    vuScanner* scanner = vuScanner_new("one two\n three");
 
     printf("Scanner done: %d\n", scanner->done);
     printf("Source: %s\n", scanner->source);
@@ -25,7 +25,7 @@ void demo_scanner() {
 void demo_lexer() {
     printf("Lexer Demo\n");
 
-    vu_scanner_t* scanner = vu_scanner_new("4 * 3 + 2 - 1");
+    vuScanner* scanner = vuScanner_new("4 * 3 + 2 - 1");
     vu_Lexer_t* lexer = vu_Lexer_new(scanner);
 
     

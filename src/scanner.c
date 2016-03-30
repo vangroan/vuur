@@ -2,8 +2,8 @@
 
 #include "scanner.h"
 
-vu_scanner_t* vu_scanner_new(char* source) {
-    vu_scanner_t* self = (vu_scanner_t*)malloc(sizeof(vu_scanner_t));
+vuScanner* vuScanner_new(char* source) {
+    vuScanner* self = malloc(sizeof(vuScanner));
     self->source = source;
     self->sourceLength = strlen(source);
     self->position = -1;
@@ -13,11 +13,11 @@ vu_scanner_t* vu_scanner_new(char* source) {
     return self;
 }
 
-void vu_scanner_free(vu_scanner_t* self) {
+void vu_scanner_free(vuScanner* self) {
     free(self);
 }
 
-vu_character_t vu_scanner_next(vu_scanner_t* self) {
+vu_character_t vu_scanner_next(vuScanner* self) {
 
     if (self->position >= self->sourceLength) {
         self->done = vu_True;
@@ -49,6 +49,6 @@ vu_character_t vu_scanner_next(vu_scanner_t* self) {
     return c;
 }
 
-vu_Bool vu_scanner_running(vu_scanner_t* self) {
+vu_Bool vu_scanner_running(vuScanner* self) {
     return !self->done;
 }
