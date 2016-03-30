@@ -18,6 +18,21 @@ create_null_character(const int pos, const int line, const int col) {
 }
 
 
+static inline enum vu_character_kind
+choose_character_kind(const char chr) {
+    switch (chr) {
+        case '\n':
+        case '\r':
+        case '\t':
+            return vu_whitespace;
+        break;
+        default:
+            return vu_char;
+        break;
+    }
+}
+
+
 // Mark scanner as done
 static void
 scanner_finish(struct VuScanner* self) {
@@ -72,9 +87,7 @@ vu_scanner_next(struct VuScanner* self) {
     c.position = self->position;
     c.line = self->line;
     c.column = self->column;
-
-    // TODO: Character kinds
-    c.kind = vu_char;
+    c.kind = choose_character_kind(c.val);    
 
     return c;
 }

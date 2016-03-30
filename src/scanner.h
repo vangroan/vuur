@@ -9,7 +9,7 @@
 
 enum vu_character_kind {
     vu_char,
-    vu_space,
+    vu_whitespace,
     vu_eof
 };
 
