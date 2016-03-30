@@ -33,7 +33,7 @@ typedef struct {
 } vu_character_t;
 
 
-vuScanner* vuScanner_new(char* source) ;
+vuScanner* vuScanner_new(const char* source) ;
 void vu_scanner_free(vuScanner* self);
 vu_character_t vu_scanner_next(vuScanner* self);
 vu_Bool vu_scanner_running(vuScanner* self);

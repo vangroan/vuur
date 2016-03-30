@@ -2,9 +2,9 @@
 
 #include "scanner.h"
 
-vuScanner* vuScanner_new(char* source) {
+vuScanner* vuScanner_new(const char* source) {
     vuScanner* self = malloc(sizeof(vuScanner));
-    self->source = source;
+    self->source = (char*)source;
     self->sourceLength = strlen(source);
     self->position = -1;
     self->line = 0;
