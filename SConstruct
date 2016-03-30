@@ -6,7 +6,6 @@ env = Environment(tools=['mingw'], CFLAGS='-Wall --std=c99')
 source=[
     'src/main.c',
     'src/scanner.c',
-    'src/token.c',
     'src/lexer.c',
     ]
 
