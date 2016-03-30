@@ -21,6 +21,7 @@ create_null_character(const int pos, const int line, const int col) {
 static inline enum vu_character_kind
 choose_character_kind(const char chr) {
     switch (chr) {
+        case ' ':
         case '\n':
         case '\r':
         case '\t':

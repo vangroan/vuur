@@ -13,7 +13,9 @@ enum VuTokenKind {
     TOKEN_PLUS,
     TOKEN_MINUS,
 
-    TOKEN_NUMLITERAL
+    TOKEN_NUMLITERAL,
+
+    TOKEN_LINEBREAK
 };
 
 
@@ -31,6 +33,8 @@ struct VuToken {
 struct VuLexer {
     struct VuScanner* scanner;
 
+    struct VuCharacter character;
+
     struct VuToken* current;
 
     bool done;
@@ -39,6 +43,7 @@ struct VuLexer {
 
 struct VuLexer* vu_lexer_new(struct VuScanner* scanner);
 void vu_lexer_free(struct VuLexer* self);
-struct VuToken* vu_lexer_scan(struct VuLexer* self);
+struct VuToken* vu_lexer_next(struct VuLexer* self);
+bool vu_lexer_running(struct VuLexer* self);
 
 #endif
