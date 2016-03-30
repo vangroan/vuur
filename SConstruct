@@ -1,7 +1,15 @@
 #!python
 
+import os
 
-env = Environment(tools=['mingw'], CFLAGS='-Wall --std=c99')
+tools = []
+
+if os.name == 'nt':
+    tools.append('mingw')
+else:
+    tools.append('default')
+
+env = Environment(tools=tools, CFLAGS='-Wall --std=c99')
 
 source=[
     'src/main.c',
@@ -9,4 +17,4 @@ source=[
     'src/lexer.c',
     ]
 
-env.Program(target='build/vuur.exe', source=source)
+env.Program(target='build/vuur', source=source)
