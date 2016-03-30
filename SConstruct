@@ -9,7 +9,11 @@ if os.name == 'nt':
 else:
     tools.append('default')
 
-env = Environment(tools=tools, CFLAGS='-Wall --std=c99')
+env = Environment(
+    tools=tools, 
+    CFLAGS='-Wall --std=c99',
+    ENV={ 'PATH' : os.environ.get('PATH') },
+    )
 
 source=[
     'src/main.c',
