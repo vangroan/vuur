@@ -1,7 +1,7 @@
 #!python
 
 
-env = Environment(tools=['mingw'], CFLAGS='-Wall')
+env = Environment(tools=['mingw'], CFLAGS='-Wall --std=c99')
 
 source=[
     'src/main.c',
@@ -11,4 +11,3 @@ source=[
     ]
 
 env.Program(target='build/vuur.exe', source=source)
-
