@@ -9,7 +9,7 @@
 void assert(bool condition, const char* message) {
     if (!condition) {
         printf("Assertion failed: %s", message);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 }
 
@@ -58,6 +58,10 @@ void demo_lexer() {
     struct VuLexer* lexer = vu_lexer_new(scanner);
 
     vu_lexer_next(lexer);
+    vu_lexer_next(lexer);
+    vu_lexer_next(lexer);
+    vu_lexer_next(lexer);
+    vu_lexer_next(lexer);
 
     vu_lexer_free(lexer);
     vu_scanner_free(scanner);
@@ -70,5 +74,5 @@ void demo_lexer() {
 int main() {
     demo_scanner();
     demo_lexer();
-    return 0;
+    return EXIT_SUCCESS;
 }

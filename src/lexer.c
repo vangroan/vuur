@@ -48,7 +48,12 @@ isNone(const struct VuCharacter* chr) {
 
 static inline bool
 isWhitespace(const char c) {
-    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+    return c == ' ' || c == '\t' || c == '\r';
+}
+
+static inline bool
+isNewline(const char c) {
+    return c == '\n';
 }
 
 static inline bool
@@ -57,8 +62,23 @@ isNumber(const char c) {
 }
 
 static inline bool
+isUnderscore(const char c) {
+    return c == '_';
+}
+
+static inline bool
 isLetter(const char c) {
     return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z');
+}
+
+static inline bool
+isOpenBracket(const char c) {
+    return c == '(';
+}
+
+static inline bool
+isCloseBracket(const char c) {
+    return c == ')';
 }
 
 static inline bool
@@ -94,9 +114,8 @@ lexer_checkEOF(struct VuLexer* self) {
 static void
 lexer_readUntilWhitespace(struct VuLexer* self) {
     printf("Reading until whitespace\n");
-    while (!isWhitespace(lexer_char(self))
-        && !isNumber(lexer_char(self))
-        && !lexer_checkEOF(self)) {
+    while ((isLetter(lexer_char(self)) || isNumber(lexer_char(self))
+            || isUnderscore(lexer_char(self))) && !lexer_checkEOF(self)) {
         dumpCharacter(&self->character);
         lexer_consume(self);
     }
@@ -153,7 +172,7 @@ struct VuToken*
 vu_lexer_next(struct VuLexer* self) {
     dumpCharacter(&self->character);
     // Ignore leading whitespace
-    while((isWhitespace(lexer_char(self)) || isNone(&self->character))
+    while ((isWhitespace(lexer_char(self)) || isNone(&self->character))
         && vu_scanner_running(self->scanner)) {
         lexer_next_character(self);
     }
@@ -163,6 +182,15 @@ vu_lexer_next(struct VuLexer* self) {
         lexer_readUntilWhitespace(self);
         dumpToken(self->current);
         lexer_keyword(self);
+    } else if (isOpenBracket(lexer_char(self))) {
+        lexer_makeToken(self);
+        lexer_next_character(self);
+    } else if (isCloseBracket(lexer_char(self))) {
+        lexer_makeToken(self);
+        lexer_next_character(self);
+    } else if (isNewline(lexer_char(self))) {
+        lexer_makeToken(self);
+        lexer_next_character(self);
     }
 
     return self->current;
