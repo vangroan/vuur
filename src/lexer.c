@@ -8,8 +8,17 @@
 
 static void
 dumpToken(struct VuToken* token) {
-    printf("<Token %d >\n",
-        token->position);
+    char buffer[128];
+
+    size_t max = 127;
+    size_t length = token->length > max ? max : token->length;
+    memcpy(&buffer, token->content, length);
+    buffer[length+1] = '\0';
+    printf("Length: %d\n", length);
+    printf("<Token %d '%s' >\n",
+        token->position,
+        buffer
+    );
 }
 
 static void
@@ -129,7 +138,7 @@ lexer_makeToken(struct VuLexer* self) {
     self->current->line = self->character.line;
     self->current->column = self->character.column;
     self->current->content = self->character.content;
-    self->current->length = 0;
+    self->current->length = 1;
 }
 
 
@@ -180,7 +189,6 @@ vu_lexer_next(struct VuLexer* self) {
     if (isLetter(lexer_char(self))) {
         lexer_makeToken(self);
         lexer_readUntilWhitespace(self);
-        dumpToken(self->current);
         lexer_keyword(self);
     } else if (isOpenBracket(lexer_char(self))) {
         lexer_makeToken(self);
@@ -192,6 +200,8 @@ vu_lexer_next(struct VuLexer* self) {
         lexer_makeToken(self);
         lexer_next_character(self);
     }
+
+    dumpToken(self->current);
 
     return self->current;
 }
