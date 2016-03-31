@@ -52,7 +52,7 @@ getCharacterPointer(const struct VuScanner* self, const int position) {
 // Public
 // ------
 
-struct VuScanner* 
+struct VuScanner*
 vu_scanner_new(const char* source) {
     struct VuScanner* self = malloc(sizeof(struct VuScanner));
     self->source = (char*)source;
@@ -65,13 +65,13 @@ vu_scanner_new(const char* source) {
 }
 
 
-void 
+void
 vu_scanner_free(struct VuScanner* self) {
     free(self);
 }
 
 
-struct VuCharacter 
+struct VuCharacter
 vu_scanner_next(struct VuScanner* self) {
 
     self->position++;
@@ -96,13 +96,13 @@ vu_scanner_next(struct VuScanner* self) {
     c.line = self->line;
     c.column = self->column;
     c.content = getCharacterPointer(self, c.position);
-    c.kind = choose_character_kind(c.val);    
+    c.kind = choose_character_kind(c.val);
 
     return c;
 }
 
 
-bool 
+bool
 vu_scanner_running(const struct VuScanner* self) {
     return !self->done;
 }

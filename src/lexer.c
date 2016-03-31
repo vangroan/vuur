@@ -8,7 +8,7 @@
 
 static void
 dumpToken(struct VuToken* token) {
-    printf("<Token %d >\n", 
+    printf("<Token %d >\n",
         token->position);
 }
 
@@ -24,7 +24,7 @@ dumpCharacter(struct VuCharacter* chr) {
         default: kind = "unknown"; break;
     }
 
-    printf("<Character %c %d %s >\n", 
+    printf("<Character %c %d %s >\n",
         chr->content == NULL ? ' ' : chr->content[0],
         chr->position,
         kind
@@ -128,7 +128,7 @@ lexer_keyword(struct VuLexer* self) {
 struct VuLexer*
 vu_lexer_new(struct VuScanner* scanner) {
     struct VuLexer* lexer = malloc(sizeof(struct VuLexer));
-    
+
     lexer->scanner = scanner;
 
     vu_character_init(&lexer->character);
@@ -156,7 +156,7 @@ vu_lexer_next(struct VuLexer* self) {
     while((isWhitespace(lexer_char(self)) || isNone(&self->character))
         && vu_scanner_running(self->scanner)) {
         lexer_next_character(self);
-    } 
+    }
 
     if (isLetter(lexer_char(self))) {
         lexer_makeToken(self);
