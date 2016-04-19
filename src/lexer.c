@@ -123,7 +123,7 @@ lexer_checkEOF(struct VuLexer* self) {
 
 static void
 lexer_readUntilWhitespace(struct VuLexer* self) {
-    printf("Reading until whitespace\n");
+	// TODO: Rename to readIdentifier
     while ((isLetter(lexer_char(self)) || isNumber(lexer_char(self))
             || isUnderscore(lexer_char(self))) && !lexer_checkEOF(self)) {
         lexer_consume(self);
@@ -179,7 +179,7 @@ vu_lexer_free(struct VuLexer* self) {
 
 struct VuToken*
 vu_lexer_next(struct VuLexer* self) {
-    dumpCharacter(&self->character);
+
     // Ignore leading whitespace
     while ((isWhitespace(lexer_char(self)) || isNone(&self->character))
         && vu_scanner_running(self->scanner)) {
