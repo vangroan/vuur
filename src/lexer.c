@@ -9,15 +9,16 @@
 static void
 dumpToken(struct VuToken* token) {
     char buffer[128];
-
-    size_t max = 127;
+    const size_t max = 127;
     size_t length = token->length > max ? max : token->length;
     memcpy(&buffer, token->content, length);
-    buffer[length+1] = '\0';
-    printf("Length: %llu\n", (unsigned long long)length);
-    printf("<Token %d '%s' >\n",
+    buffer[length] = '\0';
+    printf("<Token %d:%d:%d '%s' length:%d >\n",
         token->position,
-        buffer
+		token->line,
+		token->column,
+        buffer,
+		token->length
     );
 }
 
@@ -125,7 +126,6 @@ lexer_readUntilWhitespace(struct VuLexer* self) {
     printf("Reading until whitespace\n");
     while ((isLetter(lexer_char(self)) || isNumber(lexer_char(self))
             || isUnderscore(lexer_char(self))) && !lexer_checkEOF(self)) {
-        dumpCharacter(&self->character);
         lexer_consume(self);
     }
 }
@@ -138,7 +138,7 @@ lexer_makeToken(struct VuLexer* self) {
     self->current->line = self->character.line;
     self->current->column = self->character.column;
     self->current->content = self->character.content;
-    self->current->length = 1;
+    self->current->length = 0;
 }
 
 
@@ -192,12 +192,15 @@ vu_lexer_next(struct VuLexer* self) {
         lexer_keyword(self);
     } else if (isOpenBracket(lexer_char(self))) {
         lexer_makeToken(self);
+		lexer_consume(self);
         lexer_next_character(self);
     } else if (isCloseBracket(lexer_char(self))) {
         lexer_makeToken(self);
+		lexer_consume(self);
         lexer_next_character(self);
     } else if (isNewline(lexer_char(self))) {
         lexer_makeToken(self);
+		lexer_consume(self);
         lexer_next_character(self);
     }
 
