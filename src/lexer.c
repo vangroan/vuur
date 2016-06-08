@@ -13,7 +13,7 @@ dumpToken(struct VuToken* token) {
     size_t max = 127;
     size_t length = token->length > max ? max : token->length;
     memcpy(&buffer, token->content, length);
-    buffer[length+1] = '\0';
+    buffer[length] = '\0';
     printf("Length: %d\n", length);
     printf("<Token %d '%s' >\n",
         token->position,
