@@ -6,30 +6,34 @@ pub(crate) const EOF_CHAR: char = '\0';
 
 pub(crate) struct Cursor<'a> {
     chars: CharIndices<'a>,
-    /// Byte offset of the next character.
+    /// Previous character returned by the internal iterator.
     ///
-    /// Function for retrieving the current
-    /// offset is nightly only, so we need
-    /// our own book keeping.
-    prev_offset: u32,
-
-    /// The previous character, which can be used
-    /// by the lexer to validate its invariants.
-    #[cfg(debug)]
-    prev_char: char,
+    /// Store the result of the previous iteration so it's
+    /// available on demand as the "current" state of the cursor.
+    prev: (u32, char),
+    /// Original size of source passed in.
+    orig_size: usize,
 }
 
 impl<'a> Cursor<'a> {
     pub(crate) fn from_str(source: &'a str) -> Self {
         Cursor {
             chars: source.char_indices(),
-            prev_offset: 0,
+            prev: (0, EOF_CHAR),
+            orig_size: source.len(),
         }
     }
 
-    /// Previous offset
+    /// Byte offset of the current character.
     pub(crate) fn offset(&self) -> BytePos {
-        BytePos(self.prev_offset)
+        BytePos(self.prev.0)
+    }
+
+    /// Current character in the iteration.
+    ///
+    /// If iteration has not started, will return end-of-file character.
+    pub(crate) fn current(&self) -> char {
+        self.prev.1
     }
 
     /// Peek the next character without advancing the cursor.
@@ -45,7 +49,22 @@ impl<'a> Cursor<'a> {
         iter.next().map(|(_, c)| c).unwrap_or(EOF_CHAR)
     }
 
-    pub(crate) fn is_eof(&self) -> bool {
+    /// Peek the byte position of the next character.
+    pub(crate) fn peek_offset(&self) -> BytePos {
+        // Byte position of next character is determined by number
+        // of byts taken up by the current character.
+        //
+        // Because of UTF-8 encoding, there is no easy way
+        // to know the size of the current character except
+        // advancing the iterator.
+        let mut iter = self.chars.clone();
+        iter.next()
+            .map(|(index, _)| BytePos(index as u32))
+            .unwrap_or_else(|| BytePos(self.orig_size as u32))
+    }
+
+    // Indicates whether the cursor is at the end of the source.
+    pub(crate) fn at_end(&self) -> bool {
         let mut iter = self.chars.clone();
         iter.next().is_none()
     }
@@ -56,17 +75,14 @@ impl<'a> Cursor<'a> {
     pub(crate) fn bump(&mut self) -> Option<(BytePos, char)> {
         match self.chars.next() {
             Some((i, c)) => {
+                // Convert index to smaller integer so
+                // tuple fits into 64-bits.
                 let i = i as u32;
-                self.prev_offset = i;
+                self.prev = (i, c);
                 Some((BytePos(i), c))
             }
             None => None,
         }
-    }
-
-    #[cfg(debug)]
-    pub(crate) fn prev_char(&self) -> char {
-        self.prev_char
     }
 }
 
@@ -142,7 +158,7 @@ mod test {
 
     #[test]
     fn test_eof() {
-        assert_eq!(Cursor::from_str("").is_eof(), true);
-        assert_eq!(Cursor::from_str("abc").is_eof(), false);
+        assert_eq!(Cursor::from_str("").at_end(), true);
+        assert_eq!(Cursor::from_str("abc").at_end(), false);
     }
 }

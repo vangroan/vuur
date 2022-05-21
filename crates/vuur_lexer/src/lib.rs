@@ -2,6 +2,7 @@
 mod cursor;
 mod span;
 mod token;
+mod unescape;
 
 use cursor::{Cursor, LineRecorder, EOF_CHAR};
 use span::BytePos;
@@ -35,9 +36,14 @@ impl<'a> Lexer<'a> {
     }
 
     pub fn next_token(&mut self) -> Token {
-        self.start_token();
-
+        // Cursor was left at the last character of the previous iteration's token.
+        //
+        // This iteration is responsible for setting up the cursor for
+        // its own token.
         if let Some((_, next_char)) = self.next_char() {
+            // Once the cursor is primed, we can start recording the current token.
+            self.start_token();
+
             match next_char {
                 EOF_CHAR => {
                     // Source can contain an \0 character but not
@@ -50,6 +56,8 @@ impl<'a> Lexer<'a> {
                 _ => self.make_token(TokenKind::Unknown),
             }
         } else {
+            // FIXME: EOF token is included the last character
+            self.start_token();
             self.make_token(TokenKind::EOF)
         }
     }
@@ -60,7 +68,7 @@ impl<'a> Lexer<'a> {
     /// but not be at the actual end. It's thus important to verify
     /// with this function whenever a [`TokenKind::EOF`] is encountered.
     pub fn at_end(&self) -> bool {
-        self.cursor.is_eof()
+        self.cursor.at_end()
     }
 
     /// Primes the lexer to consume the next token.
@@ -75,7 +83,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn make_token(&mut self, kind: TokenKind) -> Token {
-        let size = self.cursor.offset().0 - self.start_pos.0 as u32;
+        let size = self.cursor.peek_offset().0 - self.start_pos.0 as u32;
 
         Token {
             offset: self.start_pos,
@@ -98,7 +106,7 @@ impl<'a> Lexer<'a> {
 
     /// Consumes a single newline token.
     fn consume_newline(&mut self) -> Token {
-        self.next_char();
+        // TODO: assert current == \n
         // Windows carriage return
         if self.cursor.peek() == '\r' {
             self.next_char();
@@ -202,7 +210,7 @@ mod test {
         let source = lexer.source.to_owned();
 
         for token in lexer.into_iter() {
-            println!("'{}' - {:?}", token.fragment(&source), token);
+            println!("'{}' - {:?}", unescape::unescape_str(token.fragment(&source)), token);
         }
 
         // let token_0 = lexer.next_token();
