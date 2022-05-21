@@ -1,4 +1,9 @@
+use crate::span::BytePos;
+
+#[derive(Debug)]
 pub struct Token {
+    pub offset: BytePos,
+    pub size: u32, // in bytes
     pub kind: TokenKind,
 }
 
@@ -15,4 +20,12 @@ pub enum TokenKind {
 
     // Number Literal
     Number,
+}
+
+impl Token {
+    pub fn fragment<'a>(&self, source: &'a str) -> &'a str {
+        let start = self.offset.0 as usize;
+        let end = start + self.size as usize;
+        &source[start..end]
+    }
 }

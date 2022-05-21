@@ -23,7 +23,7 @@ fn run_repl() -> std::io::Result<()> {
         let trimmed = input.trim();
 
         for token in Lexer::from_str(trimmed).into_iter() {
-            println!("{:?}", token.kind);
+            println!("{:?} - {}", token.kind, token.fragment(trimmed));
         }
     }
 }

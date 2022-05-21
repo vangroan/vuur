@@ -1,99 +1,142 @@
 //! Lexical analysis.
 mod cursor;
+mod span;
 mod token;
 
-use cursor::{Cursor, EOF_CHAR};
+use cursor::{Cursor, LineRecorder, EOF_CHAR};
+use span::BytePos;
 pub use token::{Token, TokenKind};
 
 pub struct Lexer<'a> {
     cursor: Cursor<'a>,
-
+    lines: LineRecorder,
     /// Keep reference to the source so the parser can
     /// slice fragments from it.
     source: &'a str,
+    /// Start absolute byte position of the current token
+    /// in the source.
+    start_pos: BytePos,
 }
 
 impl<'a> Lexer<'a> {
     pub fn from_str(source: &'a str) -> Self {
         Lexer {
             source,
+            lines: LineRecorder::default(),
             cursor: Cursor::from_str(source),
+            start_pos: BytePos(0),
         }
+    }
+
+    /// Retrieve the original source code that was
+    /// passed into the lexer.
+    pub fn source(&self) -> &str {
+        self.source
     }
 
     pub fn next_token(&mut self) -> Token {
-        // self.start_token();
+        self.start_token();
 
-        match self.cursor.peek() {
-            EOF_CHAR => {
-                // Source can contain an \0 character but not
-                // actually be at the end of the stream.
-                self.cursor.bump();
-                self.make_token(TokenKind::EOF)
+        if let Some((_, next_char)) = self.next_char() {
+            match next_char {
+                EOF_CHAR => {
+                    // Source can contain an \0 character but not
+                    // actually be at the end of the stream.
+                    self.make_token(TokenKind::EOF)
+                }
+                c if Self::is_whitespace(c) => self.consume_whitespace(),
+                '\n' | '\r' => self.consume_newline(),
+                c if Self::is_digit(c) => self.consume_number(),
+                _ => self.make_token(TokenKind::Unknown),
             }
-            c if is_whitespace(c) => self.whitespace(),
-            '\n' | '\r' => self.newline(),
-            c if is_digit(c) => self.number_literal(),
-            _ => {
-                // println!("Unknown: {:?}", c);
-                self.cursor.bump();
-                self.make_token(TokenKind::Unknown)
-            }
+        } else {
+            self.make_token(TokenKind::EOF)
         }
     }
 
-    pub fn is_eof(&self) -> bool {
+    /// Indicates whether the lexer is at the end of the source.
+    ///
+    /// Note that source can contain '\0' (end-of-file) characters,
+    /// but not be at the actual end. It's thus important to verify
+    /// with this function whenever a [`TokenKind::EOF`] is encountered.
+    pub fn at_end(&self) -> bool {
         self.cursor.is_eof()
     }
 
+    /// Primes the lexer to consume the next token.
     fn start_token(&mut self) {
-        todo!()
+        self.start_pos = self.cursor.offset();
+    }
+
+    /// Advance the character cursor, and inspect the encountered
+    /// characters. When newlines are encountered, a line is recorded.
+    fn next_char(&mut self) -> Option<(BytePos, char)> {
+        self.lines.bump(&mut self.cursor)
     }
 
     fn make_token(&mut self, kind: TokenKind) -> Token {
-        Token { kind }
-    }
+        let size = self.cursor.offset().0 - self.start_pos.0 as u32;
 
+        Token {
+            offset: self.start_pos,
+            size,
+            kind,
+        }
+    }
+}
+
+/// Methods for consuming specific tokens.
+impl<'a> Lexer<'a> {
     /// Consume whitespace.
-    fn whitespace(&mut self) -> Token {
-        while is_whitespace(self.cursor.peek()) {
-            self.cursor.bump();
+    fn consume_whitespace(&mut self) -> Token {
+        while Self::is_whitespace(self.cursor.peek()) {
+            self.next_char();
         }
 
         self.make_token(TokenKind::Whitespace)
     }
 
-    fn newline(&mut self) -> Token {
-        self.cursor.bump();
+    /// Consumes a single newline token.
+    fn consume_newline(&mut self) -> Token {
+        self.next_char();
         // Windows carriage return
         if self.cursor.peek() == '\r' {
-            self.cursor.bump();
+            self.next_char();
         }
         self.make_token(TokenKind::Newline)
     }
 
-    fn number_literal(&mut self) -> Token {
-        while is_digit(self.cursor.peek()) {
-            self.cursor.bump();
+    /// Consumes a number literal.
+    fn consume_number(&mut self) -> Token {
+        // debug_assert!(Self::is_digit(self.cursor.prev_char()));
+
+        while Self::is_digit(self.cursor.peek()) {
+            self.next_char();
         }
         self.make_token(TokenKind::Number)
     }
 }
 
-fn is_whitespace(c: char) -> bool {
-    // Doesn't include new line characters, because
-    // they specify end-of-statement elsewhere.
-    matches!(
-        c,
-        '\u{0020}' // space
-        | '\u{0009}' // tab
-        | '\u{00A0}' // no-break space
-        | '\u{FEFF}' // zero width no-break space
-    )
-}
+/// Methods for testing characters.
+impl<'a> Lexer<'a> {
+    /// Test whether the character is considered whitespace
+    /// that should be ignored by the parser later.
+    ///
+    /// Doesn't include newline characters, because in Vuur
+    /// newline are significant, specifying end-of-statement.
+    fn is_whitespace(c: char) -> bool {
+        matches!(
+            c,
+            '\u{0020}' // space
+            | '\u{0009}' // tab
+            | '\u{00A0}' // no-break space
+            | '\u{FEFF}' // zero width no-break space
+        )
+    }
 
-fn is_digit(c: char) -> bool {
-    matches!(c, '0'..='9')
+    fn is_digit(c: char) -> bool {
+        matches!(c, '0'..='9')
+    }
 }
 
 impl<'a> IntoIterator for Lexer<'a> {
@@ -119,7 +162,7 @@ impl<'a> Iterator for LexerIter<'a> {
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.lexer.is_eof() {
+        if self.lexer.at_end() {
             if self.done {
                 None
             } else {
@@ -146,5 +189,25 @@ mod test {
         assert_eq!(lexer.next_token().kind, TokenKind::Newline);
         assert_eq!(lexer.next_token().kind, TokenKind::Whitespace);
         assert_eq!(lexer.next_token().kind, TokenKind::EOF);
+    }
+
+    #[test]
+    fn test_lines() {
+        let mut lexer = Lexer::from_str(
+            r"0
+        1
+        23",
+        );
+
+        let source = lexer.source.to_owned();
+
+        for token in lexer.into_iter() {
+            println!("'{}' - {:?}", token.fragment(&source), token);
+        }
+
+        // let token_0 = lexer.next_token();
+        // assert_eq!(token_0.offset, 0);
+        // assert_eq!(token_0.size, 1);
+        // assert_eq!(token_0.kind, TokenKind::Number);
     }
 }
