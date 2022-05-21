@@ -16,6 +16,7 @@ pub(crate) struct Cursor<'a> {
 }
 
 impl<'a> Cursor<'a> {
+    /// Construct cursor from given source code text.
     pub(crate) fn from_str(source: &'a str) -> Self {
         Cursor {
             chars: source.char_indices(),
@@ -52,7 +53,7 @@ impl<'a> Cursor<'a> {
     /// Peek the byte position of the next character.
     pub(crate) fn peek_offset(&self) -> BytePos {
         // Byte position of next character is determined by number
-        // of byts taken up by the current character.
+        // of bytes taken up by the current character.
         //
         // Because of UTF-8 encoding, there is no easy way
         // to know the size of the current character except
@@ -61,6 +62,11 @@ impl<'a> Cursor<'a> {
         iter.next()
             .map(|(index, _)| BytePos(index as u32))
             .unwrap_or_else(|| BytePos(self.orig_size))
+    }
+
+    /// Original length of source text before cursor moved.
+    pub(crate) fn original_length(&self) -> u32 {
+        self.orig_size
     }
 
     // Indicates whether the cursor is at the end of the source.
@@ -81,51 +87,15 @@ impl<'a> Cursor<'a> {
                 self.prev = (i, c);
                 Some((BytePos(i), c))
             }
-            None => None,
-        }
-    }
-}
-
-pub(crate) struct LineRecorder {
-    /// Positions in source code where each line starts.
-    ///
-    /// The position is the first character after the last
-    /// newline token ended. Column number can be calculated
-    /// given a character position.
-    ///
-    /// Implicitly the index of the element in the vector
-    /// is the line number, zero-indexed.
-    lines: Vec<BytePos>,
-}
-
-impl LineRecorder {
-    pub(crate) fn new() -> Self {
-        LineRecorder { lines: Vec::new() }
-    }
-
-    /// Advance the cursor and record encountered lines.
-    pub(crate) fn bump(&mut self, cursor: &mut Cursor) -> Option<(BytePos, char)> {
-        match cursor.bump() {
-            Some((pos, c)) => {
-                if c == '\n' {
-                    self.lines.push(pos);
-                }
-                Some((pos, c))
+            None => {
+                // Point the internal byte offset to one
+                // element after the source text, so calls
+                // to `offset` and `current` show that the
+                // cursor is exhausted.
+                self.prev = (self.orig_size, EOF_CHAR);
+                None
             }
-            None => None,
         }
-    }
-
-    /// Calculate the character's line and column given its
-    /// byte position.
-    pub(crate) fn pos(&self, byte_pos: BytePos, source: &str) -> Option<(u32, u32)> {
-        todo!()
-    }
-}
-
-impl Default for LineRecorder {
-    fn default() -> Self {
-        LineRecorder::new()
     }
 }
 
@@ -160,5 +130,17 @@ mod test {
     fn test_eof() {
         assert_eq!(Cursor::from_str("").at_end(), true);
         assert_eq!(Cursor::from_str("abc").at_end(), false);
+
+        // Exhausted cursor must return EOF
+        let mut cursor = Cursor::from_str("a");
+        // Initial state
+        assert_eq!(cursor.current(), EOF_CHAR);
+        assert_eq!(cursor.offset(), 0);
+        cursor.bump();
+        assert_eq!(cursor.current(), 'a');
+        assert_eq!(cursor.offset(), 0);
+        cursor.bump();
+        assert_eq!(cursor.current(), EOF_CHAR);
+        assert_eq!(cursor.offset(), 1);
     }
 }

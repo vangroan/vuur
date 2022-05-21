@@ -4,14 +4,13 @@ mod span;
 mod token;
 mod unescape;
 
-use cursor::{Cursor, LineRecorder, EOF_CHAR};
+use cursor::{Cursor, EOF_CHAR};
 use span::BytePos;
 pub use token::{Token, TokenKind};
 
 /// Lexical analyser (tokeniser) for Vuur language.
 pub struct Lexer<'a> {
     cursor: Cursor<'a>,
-    lines: LineRecorder,
     /// Keep reference to the source so the parser can
     /// slice fragments from it.
     source: &'a str,
@@ -22,11 +21,23 @@ pub struct Lexer<'a> {
 
 impl<'a> Lexer<'a> {
     pub fn from_str(source: &'a str) -> Self {
+        let mut cursor = Cursor::from_str(source);
+
+        // Initial state of the cursor is an non-existant EOF char,
+        // but the initial state of the lexer should be a valid
+        // token starting character.
+        //
+        // Prime the cursor for the first iteration.
+        cursor.bump();
+
+        // For what it's worth, the cursor gets to decide what the
+        // initial byte position is.
+        let start_pos = cursor.offset();
+
         Lexer {
             source,
-            lines: LineRecorder::default(),
-            cursor: Cursor::from_str(source),
-            start_pos: BytePos(0),
+            cursor,
+            start_pos,
         }
     }
 
@@ -36,27 +47,37 @@ impl<'a> Lexer<'a> {
         self.source
     }
 
+    /// Remainder of source to be consumed.
+    pub fn rest(&self) -> &'a str {
+        let start = self.cursor.offset().0 as usize;
+        let end = self.cursor.original_length() as usize;
+        &self.source[start..end]
+    }
+
     /// Scan the source characters and construct the next token.
     ///
     /// ## Implementation
     ///
     /// The internal iteration of the lexer follows this convention:
     ///
-    /// Each iteration (`next_token` call) is responsible for setting up
-    /// the internal cursor to consume its own token.
+    /// Each iteration (`next_token` call) starts with the assumption that
+    /// the internal cursor is pointing to the start of the remaining source
+    /// to be consumed.
     ///
-    /// The previous iteration may leave the cursor at the last character
-    /// included in its built token.
+    /// Initially, the lexer must be constructed with a cursor pointing to
+    /// the start of the source.
+    ///
+    /// When an iteration is done building a token, it must leave the cursor
+    /// at the start of the next token's text. It may not finish leaving the
+    /// cursor pointing into its own token.
     pub fn next_token(&mut self) -> Token {
-        // Cursor was left at the last character of the previous iteration's token.
-        //
-        // This iteration is responsible for setting up the cursor for
-        // its own token.
-        if let Some((_, next_char)) = self.next_char() {
-            // Once the cursor is primed, we can start recording the current token.
-            self.start_token();
+        // Invariant of the lexer is that the cursor must
+        // be pointing to the start of the remainder of the
+        // source to be consumed.
+        self.start_token();
 
-            match next_char {
+        if !self.cursor.at_end() {
+            match self.cursor.current() {
                 EOF_CHAR => {
                     // Source can contain an \0 character but not
                     // actually be at the end of the stream.
@@ -74,7 +95,7 @@ impl<'a> Lexer<'a> {
             //
             // The token's span thus points to the element
             // beyond the end of the collection, and has 0 length.
-            self.start_pos = self.cursor.peek_offset();
+            self.start_pos = self.cursor.peek_offset(); // TODO: Explicit string size
             self.make_token(TokenKind::EOF)
         }
     }
@@ -93,12 +114,11 @@ impl<'a> Lexer<'a> {
         self.start_pos = self.cursor.offset();
     }
 
-    /// Advance the character cursor, and inspect the encountered
-    /// characters. When newlines are encountered, a line is recorded.
-    fn next_char(&mut self) -> Option<(BytePos, char)> {
-        self.lines.bump(&mut self.cursor)
-    }
-
+    /// Build a token, using the source text from the position
+    /// stored by [`start_token`](struct.Lexer.html#fn-start_token) to the
+    /// current cursor position.
+    ///
+    /// Also prepare the cursor for the next iteration.
     fn make_token(&mut self, kind: TokenKind) -> Token {
         let start = self.start_pos.0 as u32;
         let end = self.cursor.peek_offset().0;
@@ -107,11 +127,21 @@ impl<'a> Lexer<'a> {
         debug_assert!(end >= start);
         let size = end - start;
 
-        Token {
+        // After this token is built, the lexer's internal state
+        // is no longer dedicated to this iteration, but to preparing
+        // for the next iteration.
+        let token = Token {
             offset: self.start_pos,
             size,
             kind,
-        }
+        };
+
+        // Position the cursor to the starting character for the
+        // next token, so the lexer's internal state is primed
+        // for the next iteration.
+        self.cursor.bump();
+
+        token
     }
 }
 
@@ -119,8 +149,10 @@ impl<'a> Lexer<'a> {
 impl<'a> Lexer<'a> {
     /// Consume whitespace.
     fn consume_whitespace(&mut self) -> Token {
+        debug_assert!(Self::is_whitespace(self.cursor.current()));
+
         while Self::is_whitespace(self.cursor.peek()) {
-            self.next_char();
+            self.cursor.bump();
         }
 
         self.make_token(TokenKind::Whitespace)
@@ -128,20 +160,22 @@ impl<'a> Lexer<'a> {
 
     /// Consumes a single newline token.
     fn consume_newline(&mut self) -> Token {
+        debug_assert!(self.cursor.current() == '\n');
+
         // TODO: assert current == \n
         // Windows carriage return
         if self.cursor.peek() == '\r' {
-            self.next_char();
+            self.cursor.bump();
         }
         self.make_token(TokenKind::Newline)
     }
 
     /// Consumes a number literal.
     fn consume_number(&mut self) -> Token {
-        // debug_assert!(Self::is_digit(self.cursor.prev_char()));
+        debug_assert!(Self::is_digit(self.cursor.current()));
 
         while Self::is_digit(self.cursor.peek()) {
-            self.next_char();
+            self.cursor.bump();
         }
         self.make_token(TokenKind::Number)
     }
@@ -222,19 +256,29 @@ mod test {
     }
 
     #[test]
+    fn test_remainder() {
+        let mut lexer = Lexer::from_str(r"abcdef");
+        lexer.next_token();
+        lexer.next_token();
+        assert_eq!(lexer.rest(), "cdef");
+
+        // Case where source is fully consumed
+        lexer.next_token();
+        lexer.next_token();
+        lexer.next_token();
+        assert_eq!(lexer.rest(), "f");
+        lexer.next_token();
+        assert_eq!(lexer.rest(), "");
+    }
+
+    #[test]
     fn test_lines() {
         // NOTE: Tests assume this rust file uses \n and not \n\r
-        let mut lexer = Lexer::from_str(
+        let lexer = Lexer::from_str(
             r"0
         1
         23",
         );
-
-        let source = lexer.source.to_owned();
-
-        // for token in lexer.into_iter() {
-        //     println!("'{}' - {:?}", unescape::unescape_str(token.fragment(&source)), token);
-        // }
 
         // (kind, offset, size)
         #[rustfmt::skip]
@@ -255,10 +299,5 @@ mod test {
             assert_eq!(token.offset.to_u32(), exp.1);
             assert_eq!(token.size, exp.2);
         }
-
-        // let token_0 = lexer.next_token();
-        // assert_eq!(token_0.offset, 0);
-        // assert_eq!(token_0.size, 1);
-        // assert_eq!(token_0.kind, TokenKind::Number);
     }
 }
