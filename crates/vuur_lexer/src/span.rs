@@ -2,6 +2,12 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BytePos(pub(crate) u32);
 
+impl BytePos {
+    pub fn to_u32(self) -> u32 {
+        self.0
+    }
+}
+
 impl std::cmp::PartialEq<u32> for BytePos {
     fn eq(&self, other: &u32) -> bool {
         self.0 == *other

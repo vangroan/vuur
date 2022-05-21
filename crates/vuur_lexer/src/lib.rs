@@ -8,6 +8,7 @@ use cursor::{Cursor, LineRecorder, EOF_CHAR};
 use span::BytePos;
 pub use token::{Token, TokenKind};
 
+/// Lexical analyser (tokeniser) for Vuur language.
 pub struct Lexer<'a> {
     cursor: Cursor<'a>,
     lines: LineRecorder,
@@ -31,10 +32,21 @@ impl<'a> Lexer<'a> {
 
     /// Retrieve the original source code that was
     /// passed into the lexer.
-    pub fn source(&self) -> &str {
+    pub fn source(&self) -> &'a str {
         self.source
     }
 
+    /// Scan the source characters and construct the next token.
+    ///
+    /// ## Implementation
+    ///
+    /// The internal iteration of the lexer follows this convention:
+    ///
+    /// Each iteration (`next_token` call) is responsible for setting up
+    /// the internal cursor to consume its own token.
+    ///
+    /// The previous iteration may leave the cursor at the last character
+    /// included in its built token.
     pub fn next_token(&mut self) -> Token {
         // Cursor was left at the last character of the previous iteration's token.
         //
@@ -56,8 +68,13 @@ impl<'a> Lexer<'a> {
                 _ => self.make_token(TokenKind::Unknown),
             }
         } else {
-            // FIXME: EOF token is included the last character
-            self.start_token();
+            // The source stream has run out, so we signal
+            // the caller by emitting an end-of-file token that
+            // doesn't exist in the text.
+            //
+            // The token's span thus points to the element
+            // beyond the end of the collection, and has 0 length.
+            self.start_pos = self.cursor.peek_offset();
             self.make_token(TokenKind::EOF)
         }
     }
@@ -83,7 +100,12 @@ impl<'a> Lexer<'a> {
     }
 
     fn make_token(&mut self, kind: TokenKind) -> Token {
-        let size = self.cursor.peek_offset().0 - self.start_pos.0 as u32;
+        let start = self.start_pos.0 as u32;
+        let end = self.cursor.peek_offset().0;
+
+        // start and end can be equal, and a token can have 0 size.
+        debug_assert!(end >= start);
+        let size = end - start;
 
         Token {
             offset: self.start_pos,
@@ -201,6 +223,7 @@ mod test {
 
     #[test]
     fn test_lines() {
+        // NOTE: Tests assume this rust file uses \n and not \n\r
         let mut lexer = Lexer::from_str(
             r"0
         1
@@ -209,8 +232,28 @@ mod test {
 
         let source = lexer.source.to_owned();
 
-        for token in lexer.into_iter() {
-            println!("'{}' - {:?}", unescape::unescape_str(token.fragment(&source)), token);
+        // for token in lexer.into_iter() {
+        //     println!("'{}' - {:?}", unescape::unescape_str(token.fragment(&source)), token);
+        // }
+
+        // (kind, offset, size)
+        #[rustfmt::skip]
+        let expected: Vec<(TokenKind, u32, u32)> = vec![
+            (TokenKind::Number,      0, 1), // 0
+            (TokenKind::Newline,     1, 1),
+            (TokenKind::Whitespace,  2, 8),
+            (TokenKind::Number,     10, 1), // 1
+            (TokenKind::Newline,    11, 1),
+            (TokenKind::Whitespace, 12, 8),
+            (TokenKind::Number,     20, 2), // 23
+            (TokenKind::EOF,        22, 0),
+        ];
+
+        for (token, exp) in lexer.into_iter().zip(expected.into_iter()) {
+            println!("{:?} == {:?}", token, exp);
+            assert_eq!(token.kind, exp.0);
+            assert_eq!(token.offset.to_u32(), exp.1);
+            assert_eq!(token.size, exp.2);
         }
 
         // let token_0 = lexer.next_token();

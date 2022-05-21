@@ -1,3 +1,5 @@
+//! Tokens.
+
 use crate::span::BytePos;
 
 #[derive(Debug)]
@@ -23,6 +25,7 @@ pub enum TokenKind {
 }
 
 impl Token {
+    /// Slice a text fragment from the given source code.
     pub fn fragment<'a>(&self, source: &'a str) -> &'a str {
         let start = self.offset.0 as usize;
         let end = start + self.size as usize;

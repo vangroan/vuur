@@ -12,7 +12,7 @@ pub(crate) struct Cursor<'a> {
     /// available on demand as the "current" state of the cursor.
     prev: (u32, char),
     /// Original size of source passed in.
-    orig_size: usize,
+    orig_size: u32,
 }
 
 impl<'a> Cursor<'a> {
@@ -20,7 +20,7 @@ impl<'a> Cursor<'a> {
         Cursor {
             chars: source.char_indices(),
             prev: (0, EOF_CHAR),
-            orig_size: source.len(),
+            orig_size: source.len() as u32,
         }
     }
 
@@ -60,7 +60,7 @@ impl<'a> Cursor<'a> {
         let mut iter = self.chars.clone();
         iter.next()
             .map(|(index, _)| BytePos(index as u32))
-            .unwrap_or_else(|| BytePos(self.orig_size as u32))
+            .unwrap_or_else(|| BytePos(self.orig_size))
     }
 
     // Indicates whether the cursor is at the end of the source.
