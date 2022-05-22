@@ -69,10 +69,20 @@ impl<'a> Cursor<'a> {
         self.orig_size
     }
 
-    // Indicates whether the cursor is at the end of the source.
+    /// Indicates whether the cursor is at the end of the source.
     pub(crate) fn at_end(&self) -> bool {
-        let mut iter = self.chars.clone();
-        iter.next().is_none()
+        // The iterator may be exhausted, there could be a previous
+        // character stored in the state.
+        //
+        // Cursor is only considered at end when last character is
+        // overwritten with EOF.
+        match self.prev {
+            (_, EOF_CHAR) => {
+                let mut iter = self.chars.clone();
+                iter.next().is_none()
+            }
+            _ => false,
+        }
     }
 
     /// Advances the cursor to the next character.

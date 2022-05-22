@@ -1,5 +1,6 @@
 [workspace]
 members = [
     "crates/vuur_lexer",
+    "crates/vuur_parse",
     "crates/vuur",
 ]

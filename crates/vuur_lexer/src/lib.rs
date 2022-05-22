@@ -6,7 +6,7 @@ mod unescape;
 
 use cursor::{Cursor, EOF_CHAR};
 use span::BytePos;
-pub use token::{Token, TokenKind};
+pub use token::{Keyword, Token, TokenKind};
 
 /// Lexical analyser (tokeniser) for Vuur language.
 pub struct Lexer<'a> {
@@ -51,6 +51,7 @@ impl<'a> Lexer<'a> {
     pub fn rest(&self) -> &'a str {
         let start = self.cursor.offset().0 as usize;
         let end = self.cursor.original_length() as usize;
+        // println!("start={} end={}", start, end);
         &self.source[start..end]
     }
 
@@ -78,6 +79,19 @@ impl<'a> Lexer<'a> {
 
         if !self.cursor.at_end() {
             match self.cursor.current() {
+                '(' => self.make_token(TokenKind::LeftParen),
+                ')' => self.make_token(TokenKind::RightParen),
+                '[' => self.make_token(TokenKind::LeftBracket),
+                ']' => self.make_token(TokenKind::RightBracket),
+                '{' => self.make_token(TokenKind::LeftBrace),
+                '}' => self.make_token(TokenKind::RightBrace),
+                '.' => self.make_token(TokenKind::Dot),
+                // '"' => self.consume_string(TokenKind::String),
+                '+' => self.make_token(TokenKind::Add),
+                '-' => self.make_token(TokenKind::Sub),
+                '*' => self.make_token(TokenKind::Mul),
+                ',' => self.make_token(TokenKind::Comma),
+
                 EOF_CHAR => {
                     // Source can contain an \0 character but not
                     // actually be at the end of the stream.
@@ -85,7 +99,9 @@ impl<'a> Lexer<'a> {
                 }
                 c if Self::is_whitespace(c) => self.consume_whitespace(),
                 '\n' | '\r' => self.consume_newline(),
+
                 c if Self::is_digit(c) => self.consume_number(),
+                c if Self::is_letter(c) => self.consume_ident(),
                 _ => self.make_token(TokenKind::Unknown),
             }
         } else {
@@ -160,7 +176,7 @@ impl<'a> Lexer<'a> {
 
     /// Consumes a single newline token.
     fn consume_newline(&mut self) -> Token {
-        debug_assert!(self.cursor.current() == '\n');
+        debug_assert!(matches!(self.cursor.current(), '\n' | '\r'));
 
         // TODO: assert current == \n
         // Windows carriage return
@@ -178,6 +194,27 @@ impl<'a> Lexer<'a> {
             self.cursor.bump();
         }
         self.make_token(TokenKind::Number)
+    }
+
+    fn consume_ident(&mut self) -> Token {
+        debug_assert!(Self::is_letter(self.cursor.current()));
+
+        while Self::is_letter_or_digit(self.cursor.peek()) {
+            self.cursor.bump();
+        }
+
+        // Attempt to convert identifier to keyword.
+        let start = self.start_pos.0 as usize;
+        let end = self.cursor.peek_offset().0 as usize;
+        let fragment = &self.source[start..end];
+        // println!("fragment: '{}'", unescape::unescape_str(fragment));
+
+        let token_kind = match Keyword::try_from(fragment) {
+            Ok(keyword) => TokenKind::Keyword(keyword),
+            Err(_) => TokenKind::Ident,
+        };
+
+        self.make_token(token_kind)
     }
 }
 
@@ -200,6 +237,14 @@ impl<'a> Lexer<'a> {
 
     fn is_digit(c: char) -> bool {
         matches!(c, '0'..='9')
+    }
+
+    fn is_letter(c: char) -> bool {
+        matches!(c, 'a'..='z' | 'A'..='Z' | '_')
+    }
+
+    fn is_letter_or_digit(c: char) -> bool {
+        Self::is_letter(c) || Self::is_digit(c)
     }
 }
 
@@ -257,18 +302,25 @@ mod test {
 
     #[test]
     fn test_remainder() {
-        let mut lexer = Lexer::from_str(r"abcdef");
-        lexer.next_token();
-        lexer.next_token();
-        assert_eq!(lexer.rest(), "cdef");
+        let mut lexer = Lexer::from_str(r"a b c d e f");
+        assert_eq!(lexer.next_token().kind, TokenKind::Ident); // a
+        assert_eq!(lexer.next_token().kind, TokenKind::Whitespace);
+        assert_eq!(lexer.next_token().kind, TokenKind::Ident); // b
+        assert_eq!(lexer.next_token().kind, TokenKind::Whitespace);
+        assert_eq!(lexer.rest(), "c d e f");
 
         // Case where source is fully consumed
-        lexer.next_token();
-        lexer.next_token();
-        lexer.next_token();
+        assert_eq!(lexer.next_token().kind, TokenKind::Ident); // c
+        assert_eq!(lexer.next_token().kind, TokenKind::Whitespace);
+        assert_eq!(lexer.next_token().kind, TokenKind::Ident); // d
+        assert_eq!(lexer.next_token().kind, TokenKind::Whitespace);
+        assert_eq!(lexer.next_token().kind, TokenKind::Ident); // e
+        assert_eq!(lexer.rest(), " f");
+        assert_eq!(lexer.next_token().kind, TokenKind::Whitespace);
         assert_eq!(lexer.rest(), "f");
-        lexer.next_token();
+        assert_eq!(lexer.next_token().kind, TokenKind::Ident); // f
         assert_eq!(lexer.rest(), "");
+        assert_eq!(lexer.next_token().kind, TokenKind::EOF);
     }
 
     #[test]
