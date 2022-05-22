@@ -1,6 +1,6 @@
 //! Lexical analysis.
 mod cursor;
-mod span;
+pub mod span;
 mod token;
 mod unescape;
 
@@ -90,7 +90,10 @@ impl<'a> Lexer<'a> {
                 '+' => self.make_token(TokenKind::Add),
                 '-' => self.make_token(TokenKind::Sub),
                 '*' => self.make_token(TokenKind::Mul),
+                '&' => self.make_token(TokenKind::Ampersand),
                 ',' => self.make_token(TokenKind::Comma),
+                ':' => self.make_token(TokenKind::Colon),
+                ';' => self.make_token(TokenKind::Semicolon),
 
                 EOF_CHAR => {
                     // Source can contain an \0 character but not

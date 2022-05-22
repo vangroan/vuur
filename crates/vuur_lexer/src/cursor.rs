@@ -152,5 +152,27 @@ mod test {
         cursor.bump();
         assert_eq!(cursor.current(), EOF_CHAR);
         assert_eq!(cursor.offset(), 1);
+
+        // Test case where string has explicit EOF sentinal.
+        let mut cursor = Cursor::from_str("abc\0");
+        assert_eq!(cursor.bump(), Some((BytePos(0), 'a')));
+        assert_eq!(cursor.current(), 'a');
+        assert_eq!(cursor.offset(), 0);
+
+        assert_eq!(cursor.bump(), Some((BytePos(1), 'b')));
+        assert_eq!(cursor.current(), 'b');
+        assert_eq!(cursor.offset(), 1);
+
+        assert_eq!(cursor.bump(), Some((BytePos(2), 'c')));
+        assert_eq!(cursor.current(), 'c');
+        assert_eq!(cursor.offset(), 2);
+
+        assert_eq!(cursor.bump(), Some((BytePos(3), EOF_CHAR)));
+        assert_eq!(cursor.current(), EOF_CHAR); // explicit
+        assert_eq!(cursor.offset(), 3);
+
+        assert_eq!(cursor.bump(), None);
+        assert_eq!(cursor.current(), EOF_CHAR); // implicit
+        assert_eq!(cursor.offset(), 4);
     }
 }

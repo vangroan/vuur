@@ -25,7 +25,10 @@ pub enum TokenKind {
     Eq,           // =
     EqEq,         // ==
     NotEq,        // !=
+    Ampersand,    // &
     Comma,        // ,
+    Colon,        // :
+    Semicolon,    // ;
 
     Ident,
     /// Reserved identifiers
@@ -52,6 +55,7 @@ pub enum Keyword {
 
 impl Token {
     /// Slice a text fragment from the given source code.
+    #[inline]
     pub fn fragment<'a>(&self, source: &'a str) -> &'a str {
         let start = self.offset.0 as usize;
         let end = start + self.size as usize;
@@ -86,7 +90,10 @@ impl std::fmt::Display for TokenKind {
             T::Eq               => write!(f, "="),
             T::EqEq             => write!(f, "=="),
             T::NotEq            => write!(f, "!="),
+            T::Ampersand        => write!(f, "&"),
             T::Comma            => write!(f, ","),
+            T::Colon            => write!(f, ":"),
+            T::Semicolon        => write!(f, ";"),
             T::Ident            => write!(f, "identifier"),
             T::Keyword(keyword) => std::fmt::Display::fmt(keyword, f),
             T::Number           => write!(f, "number"),

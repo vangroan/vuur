@@ -41,6 +41,11 @@ impl<'a> TokenStream<'a> {
         self.source.get(index)
     }
 
+    #[inline]
+    pub fn token_fragment(&self, token: &Token) -> &str {
+        token.fragment(self.source)
+    }
+
     /// Consumes the current token regardless of type.
     ///
     /// Returns `None` when the cursor is at the end of the token stream.
@@ -114,7 +119,7 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Consumes one or more tokens while the token's matches given kind.
-    pub fn match_kind(&mut self, kind: TokenKind) {
+    pub fn ignore_many(&mut self, kind: TokenKind) {
         self.lexer.reset_peek();
         if let Some(token) = self.lexer.peek() {
             if token.kind == kind {
@@ -127,7 +132,7 @@ impl<'a> TokenStream<'a> {
     }
 
     /// Consumes one or more tokens while the given predicate tests as `true`.
-    pub fn match_while(&mut self, predicate: impl Fn(TokenKind) -> bool) {
+    pub fn ignore_while(&mut self, predicate: impl Fn(TokenKind) -> bool) {
         self.lexer.reset_peek();
         while let Some(token) = self.lexer.peek() {
             if predicate(token.kind) {

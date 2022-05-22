@@ -1,25 +1,28 @@
 //! Function declarations.
 
-use vuur_lexer::{Keyword, TokenKind};
+use vuur_lexer::{Keyword, Token, TokenKind};
 
+use crate::delim::Delimited;
+use crate::ident::Ident;
 use crate::stream::TokenStream;
 use crate::{Parse, ParseResult};
 
 /// Function definition statement.
 #[derive(Debug)]
 pub struct FuncDef {
-    // TODO: Ident
-    pub name: String,
-    pub args: Vec<FuncArg>,
+    pub name: Ident,
+    pub args: Delimited<FuncArg, Separator>,
 }
 
 #[derive(Debug)]
 pub struct FuncArg {
-    // TODO: Ident
-    pub name: String,
-    pub ty: String,
-    pub is_ref: String,
+    pub name: Ident,
+    pub ty: Ident,
+    pub is_ref: bool,
 }
+
+#[derive(Debug)]
+pub struct Separator;
 
 impl Parse for FuncDef {
     type Output = Self;
@@ -28,13 +31,44 @@ impl Parse for FuncDef {
         use Keyword as K;
         use TokenKind as T;
 
-        input.match_kind(T::Whitespace);
+        input.ignore_many(T::Whitespace);
         input.consume(T::Keyword(K::Func))?;
-        input.match_kind(T::Whitespace);
-        input.match_kind(T::LeftParen);
+        input.ignore_many(T::Whitespace);
+        let name = Ident::parse(input)?;
+        input.ignore_many(T::Whitespace);
+        input.consume(T::LeftParen)?;
+        let args = Delimited::<FuncArg, Separator>::parse(input)?;
+        input.ignore_many(T::Whitespace);
+        input.consume(T::RightParen)?;
 
-        input.match_kind(T::RightParen);
+        Ok(FuncDef { name, args })
+    }
+}
 
-        todo!()
+impl Parse for FuncArg {
+    type Output = Self;
+
+    fn parse(input: &mut TokenStream) -> ParseResult<Self::Output> {
+        use TokenKind as T;
+
+        input.ignore_many(T::Whitespace);
+        let name = Ident::parse(input)?;
+        input.ignore_many(T::Whitespace);
+        input.consume(T::Colon)?;
+        input.ignore_many(T::Whitespace);
+        let is_ref = input.consume(TokenKind::Ampersand).is_ok();
+        input.ignore_many(T::Whitespace);
+        let ty = Ident::parse(input)?;
+
+        Ok(FuncArg { name, ty, is_ref })
+    }
+}
+
+impl Parse for Separator {
+    type Output = Self;
+
+    fn parse(input: &mut TokenStream) -> ParseResult<Self::Output> {
+        input.consume(TokenKind::Comma)?;
+        Ok(Separator)
     }
 }

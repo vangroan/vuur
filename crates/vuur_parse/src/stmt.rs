@@ -22,6 +22,7 @@ pub enum DefStmt {
 /// Simple statement.
 #[derive(Debug)]
 pub enum SimpleStmt {
+    Unknown,
     Expr(Expr),
 }
 
@@ -33,7 +34,7 @@ impl Parse for DefStmt {
         use TokenKind as T;
 
         // Ignore empty lines
-        input.match_while(|t| t == T::Newline);
+        input.ignore_many(T::Newline);
 
         if let Some(token) = input.peek() {
             println!("DefStmt: {:?}", token);
@@ -54,7 +55,10 @@ impl Parse for DefStmt {
 impl Parse for SimpleStmt {
     type Output = Self;
 
-    fn parse(_input: &mut TokenStream) -> ParseResult<Self::Output> {
-        todo!("simple statements")
+    fn parse(input: &mut TokenStream) -> ParseResult<Self::Output> {
+        if let Some(token) = input.next_token() {
+            println!("unknown - {}", input.token_fragment(&token));
+        }
+        Ok(SimpleStmt::Unknown)
     }
 }

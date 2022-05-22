@@ -1,15 +1,16 @@
 //! Parsing (syntactic analysis).
+use crate::module::VuurModule;
+use crate::stream::TokenError;
 use crate::stream::TokenStream;
-use module::VuurModule;
-use stream::TokenError;
 use vuur_lexer::Lexer;
 
-mod delim;
+pub mod delim;
 mod expr;
-mod func;
+pub mod func;
+pub mod ident;
 pub mod module;
 mod stmt;
-mod stream;
+pub mod stream;
 
 pub fn parse_str(source: &str) -> ParseResult<VuurModule> {
     let lexer = Lexer::from_str(source);

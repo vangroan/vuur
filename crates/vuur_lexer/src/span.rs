@@ -3,6 +3,10 @@
 pub struct BytePos(pub(crate) u32);
 
 impl BytePos {
+    pub fn from_u32(index: u32) -> BytePos {
+        BytePos(index)
+    }
+
     pub fn to_u32(self) -> u32 {
         self.0
     }
