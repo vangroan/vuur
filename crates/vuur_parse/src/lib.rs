@@ -11,6 +11,7 @@ pub mod ident;
 pub mod module;
 mod stmt;
 pub mod stream;
+mod ty;
 
 pub fn parse_str(source: &str) -> ParseResult<VuurModule> {
     let lexer = Lexer::from_str(source);

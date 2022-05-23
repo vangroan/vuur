@@ -5,6 +5,7 @@ use vuur_lexer::{Keyword, Token, TokenKind};
 use crate::delim::Delimited;
 use crate::ident::Ident;
 use crate::stream::TokenStream;
+use crate::ty::Type;
 use crate::{Parse, ParseResult};
 
 /// Function definition statement.
@@ -12,6 +13,7 @@ use crate::{Parse, ParseResult};
 pub struct FuncDef {
     pub name: Ident,
     pub args: Delimited<FuncArg, Separator>,
+    pub rtn: Option<FuncRtn>,
 }
 
 #[derive(Debug)]
@@ -24,6 +26,11 @@ pub struct FuncArg {
 #[derive(Debug)]
 pub struct Separator;
 
+#[derive(Debug)]
+pub struct FuncRtn {
+    pub ty: Type,
+}
+
 impl Parse for FuncDef {
     type Output = Self;
 
@@ -32,16 +39,35 @@ impl Parse for FuncDef {
         use TokenKind as T;
 
         input.ignore_many(T::Whitespace);
+
+        // keyword
         input.consume(T::Keyword(K::Func))?;
         input.ignore_many(T::Whitespace);
+
+        // name
         let name = Ident::parse(input)?;
         input.ignore_many(T::Whitespace);
+
+        // arguments
         input.consume(T::LeftParen)?;
         let args = Delimited::<FuncArg, Separator>::parse(input)?;
         input.ignore_many(T::Whitespace);
         input.consume(T::RightParen)?;
+        input.ignore_many(T::Whitespace);
 
-        Ok(FuncDef { name, args })
+        // optional return
+        let rtn = if input.consume(T::ThinArrow).is_ok() {
+            println!("arrow true");
+            let ty = Type::parse(input)?;
+            Some(FuncRtn { ty })
+        } else {
+            println!("arrow false");
+            None
+        };
+
+        // TODO: Block
+
+        Ok(FuncDef { name, args, rtn })
     }
 }
 

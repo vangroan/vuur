@@ -88,7 +88,14 @@ impl<'a> Lexer<'a> {
                 '.' => self.make_token(TokenKind::Dot),
                 // '"' => self.consume_string(TokenKind::String),
                 '+' => self.make_token(TokenKind::Add),
-                '-' => self.make_token(TokenKind::Sub),
+                '-' => {
+                    if self.cursor.peek() == '>' {
+                        self.cursor.bump();
+                        self.make_token(TokenKind::ThinArrow)
+                    } else {
+                        self.make_token(TokenKind::Sub)
+                    }
+                }
                 '*' => self.make_token(TokenKind::Mul),
                 '&' => self.make_token(TokenKind::Ampersand),
                 ',' => self.make_token(TokenKind::Comma),

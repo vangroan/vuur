@@ -25,6 +25,7 @@ pub enum TokenKind {
     Eq,           // =
     EqEq,         // ==
     NotEq,        // !=
+    ThinArrow,    // ->
     Ampersand,    // &
     Comma,        // ,
     Colon,        // :
@@ -49,8 +50,10 @@ pub enum TokenKind {
 /// Reserved identifiers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Keyword {
-    Func, // function declaration statement
-    Type, // type declaration statement
+    Func,      // function declaration statement
+    Interface, // interface type declaration
+    Struct,    // struct type declaration
+    Type,      // type declaration statement
 }
 
 impl Token {
@@ -90,6 +93,7 @@ impl std::fmt::Display for TokenKind {
             T::Eq               => write!(f, "="),
             T::EqEq             => write!(f, "=="),
             T::NotEq            => write!(f, "!="),
+            T::ThinArrow        => write!(f, "->"),
             T::Ampersand        => write!(f, "&"),
             T::Comma            => write!(f, ","),
             T::Colon            => write!(f, ":"),
@@ -119,6 +123,8 @@ impl<'a> TryFrom<&'a str> for Keyword {
         use Keyword as K;
         match value {
             "func"        => Ok(K::Func),
+            "interface"   => Ok(K::Interface),
+            "struct"      => Ok(K::Struct),
             "type"        => Ok(K::Type),
             // "break"      => Ok(K::Break),
             // "class"      => Ok(K::Class),
@@ -148,6 +154,8 @@ impl std::fmt::Display for Keyword {
         use Keyword as K;
         match self {
             K::Func         => write!(f, "func"),
+            K::Interface    => write!(f, "interface"),
+            K::Struct       => write!(f, "struct"),
             K::Type         => write!(f, "type"),
             // K::Break        => write!(f, "break"),
             // K::Class        => write!(f, "class"),
