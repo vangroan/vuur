@@ -4,6 +4,7 @@ use crate::stream::TokenError;
 use crate::stream::TokenStream;
 use vuur_lexer::Lexer;
 
+mod block;
 pub mod delim;
 mod expr;
 pub mod func;

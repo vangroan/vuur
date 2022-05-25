@@ -1,0 +1,4 @@
+
+func fib2(n: i32) -> i32 {
+    func inner() {}
+}

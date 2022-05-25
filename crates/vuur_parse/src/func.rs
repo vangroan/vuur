@@ -2,6 +2,7 @@
 
 use vuur_lexer::{Keyword, Token, TokenKind};
 
+use crate::block::Block;
 use crate::delim::Delimited;
 use crate::ident::Ident;
 use crate::stream::TokenStream;
@@ -14,6 +15,7 @@ pub struct FuncDef {
     pub name: Ident,
     pub args: Delimited<FuncArg, Separator>,
     pub rtn: Option<FuncRtn>,
+    pub body: Block,
 }
 
 #[derive(Debug)]
@@ -65,9 +67,10 @@ impl Parse for FuncDef {
             None
         };
 
-        // TODO: Block
+        // body
+        let body = Block::parse(input)?;
 
-        Ok(FuncDef { name, args, rtn })
+        Ok(FuncDef { name, args, rtn, body })
     }
 }
 

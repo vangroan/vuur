@@ -7,10 +7,10 @@ use vuur_parse::{parse_str, Parse};
 
 #[test]
 fn test_func_parse() {
-    let source = include_str!("func.vu");
+    let source = include_str!("func2.vu");
     let module = parse_str(source).unwrap();
     println!("{:#?}", module);
-    todo!()
+    todo!("function parsing")
 }
 
 #[test]

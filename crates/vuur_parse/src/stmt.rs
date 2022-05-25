@@ -35,6 +35,7 @@ impl Parse for DefStmt {
 
         // Ignore empty lines
         input.ignore_many(T::Newline);
+        input.ignore_many(T::Whitespace); // indentation
 
         if let Some(token) = input.peek() {
             println!("DefStmt: {:?}", token);
