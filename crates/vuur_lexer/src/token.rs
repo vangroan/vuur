@@ -50,8 +50,11 @@ pub enum TokenKind {
 /// Reserved identifiers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Keyword {
+    Else,      // if conditional else statement
     Func,      // function declaration statement
+    If,        // if conditional statement
     Interface, // interface type declaration
+    Return,    // block return statement
     Struct,    // struct type declaration
     Type,      // type declaration statement
 }
@@ -122,8 +125,11 @@ impl<'a> TryFrom<&'a str> for Keyword {
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
         use Keyword as K;
         match value {
+            "else"        => Ok(K::Else),
             "func"        => Ok(K::Func),
+            "if"          => Ok(K::If),
             "interface"   => Ok(K::Interface),
+            "return"      => Ok(K::Return),
             "struct"      => Ok(K::Struct),
             "type"        => Ok(K::Type),
             // "break"      => Ok(K::Break),
@@ -153,8 +159,11 @@ impl std::fmt::Display for Keyword {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         use Keyword as K;
         match self {
+            K::Else         => write!(f, "else"),
             K::Func         => write!(f, "func"),
+            K::If           => write!(f, "if"),
             K::Interface    => write!(f, "interface"),
+            K::Return       => write!(f, "return"),
             K::Struct       => write!(f, "struct"),
             K::Type         => write!(f, "type"),
             // K::Break        => write!(f, "break"),

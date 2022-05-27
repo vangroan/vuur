@@ -59,11 +59,9 @@ impl Parse for FuncDef {
 
         // optional return
         let rtn = if input.consume(T::ThinArrow).is_ok() {
-            println!("arrow true");
             let ty = Type::parse(input)?;
             Some(FuncRtn { ty })
         } else {
-            println!("arrow false");
             None
         };
 

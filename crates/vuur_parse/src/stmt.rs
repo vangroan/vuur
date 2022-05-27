@@ -2,6 +2,7 @@
 
 use vuur_lexer::{Keyword, TokenKind};
 
+use crate::cond::IfStmt;
 use crate::expr::Expr;
 use crate::func::FuncDef;
 use crate::stream::TokenStream;
@@ -15,6 +16,7 @@ use crate::{syntax_err, Parse, ParseResult};
 #[derive(Debug)]
 pub enum DefStmt {
     Func(FuncDef),
+    Return(Expr),
     Type(),
     Simple(SimpleStmt),
 }
@@ -23,6 +25,7 @@ pub enum DefStmt {
 #[derive(Debug)]
 pub enum SimpleStmt {
     Unknown,
+    If(IfStmt),
     Expr(Expr),
 }
 
@@ -42,7 +45,9 @@ impl Parse for DefStmt {
             if let T::Keyword(keyword) = token.kind {
                 match keyword {
                     K::Func => Ok(Self::Func(FuncDef::parse(input)?)),
-                    _ => Err(syntax_err(format!("unexpected keyword '{}'", keyword))),
+                    K::Return => Ok(Self::Return(Expr::parse(input)?)),
+                    // _ => Err(syntax_err(format!("unexpected keyword '{}'", keyword))),
+                    _ => Ok(Self::Simple(SimpleStmt::parse(input)?)),
                 }
             } else {
                 Ok(Self::Simple(SimpleStmt::parse(input)?))
@@ -57,9 +62,22 @@ impl Parse for SimpleStmt {
     type Output = Self;
 
     fn parse(input: &mut TokenStream) -> ParseResult<Self::Output> {
-        if let Some(token) = input.next_token() {
-            println!("unknown - {}", input.token_fragment(&token));
+        use Keyword as K;
+        use TokenKind as T;
+
+        input.reset_peek();
+        if let Some(token) = input.peek() {
+            println!("SimpleStmt: {:?}", token);
+            if let T::Keyword(keyword) = token.kind {
+                match keyword {
+                    K::If => Ok(SimpleStmt::If(IfStmt::parse(input)?)),
+                    _ => Ok(SimpleStmt::Unknown),
+                }
+            } else {
+                Ok(SimpleStmt::Expr(Expr::parse(input)?))
+            }
+        } else {
+            Err(syntax_err("unexpected end-of-file"))
         }
-        Ok(SimpleStmt::Unknown)
     }
 }

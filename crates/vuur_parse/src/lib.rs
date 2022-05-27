@@ -5,6 +5,7 @@ use crate::stream::TokenStream;
 use vuur_lexer::Lexer;
 
 mod block;
+mod cond;
 pub mod delim;
 mod expr;
 pub mod func;
