@@ -24,7 +24,7 @@ impl Parse for Block {
 
         while let Some(token) = input.peek() {
             match token.kind {
-                T::Newline => {
+                T::Newline | T::Whitespace => {
                     // When the statement starts with a newline, it's blank.
                     input.next_token();
                     continue;
@@ -39,8 +39,10 @@ impl Parse for Block {
         input.ignore_many(T::Whitespace);
 
         match input.next_token().map(|t| t.kind) {
-            Some(T::Newline | T::Semicolon | T::EOF) | None => {
+            Some(T::Newline | T::Semicolon | T::EOF | T::Keyword(_)) | None => {
                 // Valid block termination
+                //
+                // Block can be terminated with a keyword, for cases like `else`
                 Ok(Block { stmts })
             }
             Some(kind) => Err(syntax_err(

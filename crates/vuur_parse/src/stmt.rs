@@ -44,13 +44,12 @@ impl Parse for DefStmt {
             println!("DefStmt: {:?}", token);
             if let T::Keyword(keyword) = token.kind {
                 match keyword {
-                    K::Func => Ok(Self::Func(FuncDef::parse(input)?)),
+                    K::Func => FuncDef::parse(input).map(DefStmt::Func),
                     K::Return => DefStmt::parse_return_stmt(input),
-                    // _ => Err(syntax_err(format!("unexpected keyword '{}'", keyword))),
-                    _ => Ok(Self::Simple(SimpleStmt::parse(input)?)),
+                    _ => SimpleStmt::parse(input).map(DefStmt::Simple),
                 }
             } else {
-                Ok(Self::Simple(SimpleStmt::parse(input)?))
+                SimpleStmt::parse(input).map(DefStmt::Simple)
             }
         } else {
             Err(syntax_err("unexpected end-of-file"))
@@ -74,7 +73,7 @@ impl Parse for SimpleStmt {
                     _ => Ok(SimpleStmt::Unknown),
                 }
             } else {
-                Expr::parse(input).map(SimpleStmt::Expr)
+                SimpleStmt::parse_expr_stmt(input)
             }
         } else {
             Err(syntax_err("unexpected end-of-file"))
@@ -87,5 +86,16 @@ impl DefStmt {
         input.ignore_many(TokenKind::Whitespace);
         input.consume(TokenKind::Keyword(Keyword::Return))?;
         Expr::parse(input).map(DefStmt::Return)
+    }
+}
+
+impl SimpleStmt {
+    fn parse_expr_stmt(input: &mut TokenStream) -> ParseResult<SimpleStmt> {
+        let expr = Expr::parse(input)?;
+
+        // Expression statement is terminated by newline, eof or right-brace.
+        input.ignore_many(TokenKind::Newline);
+
+        Ok(SimpleStmt::Expr(expr))
     }
 }
