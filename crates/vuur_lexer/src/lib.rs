@@ -96,6 +96,14 @@ impl<'a> Lexer<'a> {
                         self.make_token(TokenKind::Sub)
                     }
                 }
+                '=' => {
+                    if self.cursor.peek() == '=' {
+                        self.cursor.bump();
+                        self.make_token(TokenKind::EqEq)
+                    } else {
+                        self.make_token(TokenKind::Eq)
+                    }
+                }
                 '*' => self.make_token(TokenKind::Mul),
                 '&' => self.make_token(TokenKind::Ampersand),
                 ',' => self.make_token(TokenKind::Comma),

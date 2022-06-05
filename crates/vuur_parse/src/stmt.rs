@@ -45,7 +45,7 @@ impl Parse for DefStmt {
             if let T::Keyword(keyword) = token.kind {
                 match keyword {
                     K::Func => Ok(Self::Func(FuncDef::parse(input)?)),
-                    K::Return => Ok(Self::Return(Expr::parse(input)?)),
+                    K::Return => DefStmt::parse_return_stmt(input),
                     // _ => Err(syntax_err(format!("unexpected keyword '{}'", keyword))),
                     _ => Ok(Self::Simple(SimpleStmt::parse(input)?)),
                 }
@@ -70,14 +70,22 @@ impl Parse for SimpleStmt {
             println!("SimpleStmt: {:?}", token);
             if let T::Keyword(keyword) = token.kind {
                 match keyword {
-                    K::If => Ok(SimpleStmt::If(IfStmt::parse(input)?)),
+                    K::If => IfStmt::parse(input).map(SimpleStmt::If),
                     _ => Ok(SimpleStmt::Unknown),
                 }
             } else {
-                Ok(SimpleStmt::Expr(Expr::parse(input)?))
+                Expr::parse(input).map(SimpleStmt::Expr)
             }
         } else {
             Err(syntax_err("unexpected end-of-file"))
         }
+    }
+}
+
+impl DefStmt {
+    fn parse_return_stmt(input: &mut TokenStream) -> ParseResult<DefStmt> {
+        input.ignore_many(TokenKind::Whitespace);
+        input.consume(TokenKind::Keyword(Keyword::Return))?;
+        Expr::parse(input).map(DefStmt::Return)
     }
 }

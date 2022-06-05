@@ -11,6 +11,8 @@ impl Parse for Block {
     type Output = Self;
 
     fn parse(input: &mut crate::stream::TokenStream) -> crate::ParseResult<Self::Output> {
+        println!("Block::parse");
+
         use TokenKind as T;
 
         // TODO: Single line block containing one expression

@@ -22,6 +22,8 @@ impl Parse for IfStmt {
     type Output = Self;
 
     fn parse(input: &mut TokenStream) -> ParseResult<Self::Output> {
+        println!("IfStmt::parse");
+
         use Keyword as K;
         use TokenKind as T;
 
