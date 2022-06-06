@@ -11,7 +11,7 @@ impl Parse for Block {
     type Output = Self;
 
     fn parse(input: &mut crate::stream::TokenStream) -> crate::ParseResult<Self::Output> {
-        println!("Block::parse");
+        println!("Block::parse; start");
 
         use TokenKind as T;
 
@@ -38,13 +38,21 @@ impl Parse for Block {
         input.consume(T::RightBrace)?;
         input.ignore_many(T::Whitespace);
 
-        match input.next_token().map(|t| t.kind) {
-            Some(T::Newline | T::Semicolon | T::EOF | T::Keyword(_)) | None => {
-                // Valid block termination
-                //
-                // Block can be terminated with a keyword, for cases like `else`
+        match input.peek().map(|t| t.kind) {
+            Some(T::Keyword(_)) => {
+                // Block can be terminated with a keyword, for cases like `else`.
+                // Do not consume so net parser can be chosen.
+                println!("Block::parse; end; keyword");
                 Ok(Block { stmts })
             }
+            Some(T::Newline | T::Semicolon | T::EOF) | None => {
+                // Valid block termination
+                //
+                println!("Block::parse; end; punctuation");
+                input.next_token();
+                Ok(Block { stmts })
+            }
+
             Some(kind) => Err(syntax_err(
                 format!(
                     "unexpected token {}; block closing brace must be followed by newline, semicolon or eof.",

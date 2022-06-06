@@ -41,17 +41,27 @@ impl Parse for IfStmt {
         let body = Block::parse(input)?;
         input.ignore_many(T::Whitespace);
 
+        println!("IfStmt::parse; TokenKind={:?}", input.peek().map(|t| t.kind));
+        input.reset_peek();
+
         // optional else
         let else_ = if let Some(T::Keyword(K::Else)) = input.peek().map(|t| t.kind) {
+            println!("IfStmt::parse; else_");
+            input.next_token();
+            input.ignore_many(T::Whitespace);
+
             // first peek advances an internal peek token to second lookahead character
             if let Some(T::Keyword(K::If)) = input.peek().map(|t| t.kind) {
-                ElseStmt::ElseIf(Box::new(IfStmt::parse(input)?))
+                println!("IfStmt::parse; else_,if");
+                IfStmt::parse(input).map(Box::new).map(ElseStmt::ElseIf)?
             } else {
+                println!("IfStmt::parse; else_,body");
                 ElseStmt::Else {
                     body: Block::parse(input)?,
                 }
             }
         } else {
+            println!("IfStmt::parse; no else_");
             ElseStmt::Empty
         };
 

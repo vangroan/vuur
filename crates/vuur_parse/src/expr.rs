@@ -258,6 +258,8 @@ impl Expr {
     fn parse_infix(input: &mut TokenStream, left: Expr, token: Token) -> ParseResult<Expr> {
         use TokenKind as T;
 
+        println!("Expr::parse_infix(_, {:?})", token.kind);
+
         let precedence = Precedence::of(token.kind);
 
         // Associativity is handled by adjusting the precedence.
