@@ -22,7 +22,7 @@ fn run_repl() -> std::io::Result<()> {
         // stdin reads up to and including newline or EOF
         let trimmed = input.trim();
 
-        for token in Lexer::from_str(trimmed).into_iter() {
+        for token in Lexer::from_source(trimmed).into_iter() {
             println!("{:?} - {}", token.kind, token.fragment(trimmed));
         }
     }

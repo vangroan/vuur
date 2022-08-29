@@ -2,8 +2,9 @@
 
 use std::convert::Infallible;
 
-use vuur_lexer::{Token, TokenKind};
+use vuur_lexer::{Keyword, Token, TokenKind};
 
+use crate::block::Block;
 use crate::ident::Ident;
 use crate::stream::TokenStream;
 use crate::{syntax_err, Parse, ParseResult};
@@ -51,6 +52,9 @@ impl Precedence {
             T::Mul | T::Div => Precedence::Factor,
             T::Eq => Precedence::Assignment,
             T::EqEq => Precedence::Equality,
+            T::Dot | T::LeftParen | T::LeftBracket => Precedence::Call,
+            // Terminators
+            T::RightParen | T::RightBracket => Precedence::None,
             _ => Precedence::None,
         }
     }
@@ -122,10 +126,6 @@ impl Associativity {
     fn is_left(&self) -> bool {
         *self == Associativity::Left
     }
-
-    fn is_right(&self) -> bool {
-        *self == Associativity::Right
-    }
 }
 
 #[derive(Debug)]
@@ -134,7 +134,9 @@ pub enum Expr {
     Unary(UnaryOp),
     Binary(BinaryOp),
     Num(NumLit),
-    Access(VarAccess),
+    NameAccess(NameAccess),
+    MemberAccess(MemberAccess),
+    Call(Call),
 }
 
 /// Number literal.
@@ -160,9 +162,63 @@ pub struct BinaryOp {
 
 /// Variable accessed/read.
 #[derive(Debug)]
-pub struct VarAccess {
+pub struct NameAccess {
     pub ident: Ident,
 }
+
+/// Member accessed/read.
+///
+/// ```not-rust
+/// foo.bar
+/// ```
+#[derive(Debug)]
+pub struct MemberAccess {
+    pub delim: Token,
+    pub lhs: Box<Expr>,
+    pub rhs: Box<Expr>,
+}
+
+/// Call to a function.
+///
+/// ```non-rust
+/// callee("a", 2, true)
+/// ```
+#[derive(Debug)]
+pub struct Call {
+    /// Expression that evaluates to a callable.
+    pub callee: Box<Expr>,
+    pub args: Vec<CallArg>,
+}
+
+/// Call argument.
+#[derive(Debug)]
+pub enum CallArg {
+    /// Argument to a call without name specified.
+    Simple(Expr),
+    /// Argument to a call with the callee's argument
+    /// name explicitly specified.
+    ///
+    /// ```not-rust
+    /// foo.bar(a: "baz", b: 1, c: false)
+    /// ```
+    Named { name: Ident, rhs: Expr },
+    /// Special syntax to pass a callable block to a function
+    /// that takes one argument.
+    ///
+    /// ```not-rust
+    /// foo.bar {
+    ///     return "hello callback"
+    /// }
+    /// ```
+    Block(Block),
+}
+
+#[derive(Debug)]
+pub struct CallSeparator;
+
+/// Seperator for member access.
+#[derive(Debug)]
+pub struct MemberSeparator;
 
 impl Parse for Expr {
     type Output = Self;
@@ -178,15 +234,12 @@ impl Expr {
     ///
     /// The implementation is a straight forward Pratt parser.
     fn parse_precedence(input: &mut TokenStream, precedence: Precedence) -> ParseResult<Expr> {
-        println!("Expr::parse_precedence");
+        println!("Expr::parse_precedence(_, {:?})", precedence);
 
         input.ignore_many(TokenKind::Whitespace);
         let token = input.next_token().ok_or_else(|| syntax_err("unexpected end-of-file"))?;
 
-        // The current expression node is wrapped in `Option`
-        // so that it can be moved into the recursive parser,
-        // and the stack value replaced with the parsing result.
-        let mut left = Some(Self::parse_prefix(input, token)?);
+        let mut left = Self::parse_prefix(input, token)?;
 
         input.ignore_many(TokenKind::Whitespace);
         input.reset_peek();
@@ -194,7 +247,7 @@ impl Expr {
         while precedence <= input.peek().map(|t| Precedence::of(t.kind)).unwrap_or(Precedence::None) {
             // Option is so we can swap the stack value,
             // but doesn't make sense for the algorithm.
-            debug_assert!(left.is_some(), "left hand side token is None");
+            // debug_assert!(left.is_some(), "left hand side token is None");
 
             // Peeking advances a peek pointer inside the token stream,
             // so it needs to be reset otherwise we are inadvertently
@@ -202,13 +255,13 @@ impl Expr {
             input.reset_peek();
 
             // There is no expression right of the last one, so we just return what we have.
-            if let None = input.peek().map(|token| token.kind) {
+            if input.peek().map(|t| t.kind).is_none() {
                 println!("Expr::parse_precedence; end-of-expression");
-                return Ok(left.take().unwrap());
+                return Ok(left);
             }
 
             let token = input.next_token().ok_or_else(|| syntax_err("expression expected"))?;
-            left = Some(Self::parse_infix(input, left.take().unwrap(), token)?);
+            left = Self::parse_infix(input, left, token)?;
 
             input.ignore_many(TokenKind::Whitespace);
         }
@@ -223,20 +276,22 @@ impl Expr {
                 input.peek().map(|t| t.kind)
             }
         );
-        Ok(left.take().unwrap())
+        Ok(left)
     }
 
     /// Parse a prefix token in an expression.
     ///
     /// This function is analogous to a parselet.
     fn parse_prefix(input: &mut TokenStream, token: Token) -> ParseResult<Expr> {
+        use Keyword as K;
         use TokenKind as T;
 
         println!("Expr::parse_prefix(_, {:?})", token.kind);
 
         match token.kind {
             T::Number => Expr::parse_number_literal(token).map(Expr::Num),
-            T::Ident => Expr::parse_var_access(input, token).map(Expr::Access),
+            T::Ident => Expr::parse_name(input, token),
+            T::Keyword(K::Func) => todo!("anonymous function"),
             T::Sub => {
                 // Negate
                 Expr::parse_precedence(input, Precedence::Unary)
@@ -299,16 +354,207 @@ impl Expr {
         Ok(NumLit { token })
     }
 
-    fn parse_var_access(input: &mut TokenStream, token: Token) -> ParseResult<VarAccess> {
-        println!("Expr::parse_var_access(_, {:?})", token.kind);
-        debug_assert_eq!(token.kind, TokenKind::Ident, "expected identifier");
+    /// Parse a variable name.
+    ///
+    /// Depending on what follows the variable's identifier, the bare
+    /// name can be part of the following:
+    ///
+    /// - dot delimited member access
+    /// - function call
+    fn parse_name(input: &mut TokenStream, token: Token) -> ParseResult<Expr> {
+        use TokenKind as T;
 
-        // TODO: Parse member access or function call. eg. foo.bar; foo.bar()
-        Ok(VarAccess {
+        println!("Expr::parse_name(_, {:?})", token.kind);
+        debug_assert_eq!(token.kind, T::Ident, "expected identifier");
+
+        // Start the parser with an initial expression.
+        let mut expr = Expr::NameAccess(NameAccess {
             ident: Ident {
                 text: input.token_fragment(&token).into(),
                 token,
             },
-        })
+        });
+
+        loop {
+            input.ignore_many(TokenKind::Whitespace);
+
+            expr = match input.peek().map(|t| t.kind) {
+                Some(T::LeftBracket) => todo!("parse subscript"),
+                Some(T::LeftParen) => {
+                    println!("Expr::parse_name(_, _) - parse call");
+                    input.consume(T::LeftParen)?;
+                    input.ignore_many(TokenKind::Whitespace);
+                    let args = Expr::parse_call_arguments(input)?;
+                    let callee = Box::new(expr);
+                    input.ignore_many(TokenKind::Whitespace);
+                    input.consume(T::RightParen)?;
+                    Expr::Call(Call { callee, args })
+                }
+                Some(T::Dot) => todo!("member access"),
+                Some(_) | None => {
+                    println!("Expr::parse_name(_, _) - end");
+                    // End
+                    break;
+                }
+            };
+        }
+
+        Ok(expr)
+    }
+
+    /// Parse a variable name.
+    ///
+    /// Depending on what follows the variable's identifier, the bare
+    /// name can be part of the following:
+    ///
+    /// - dot delimited member access
+    /// - function call
+    // fn parse_bare_name(input: &mut TokenStream, token: Token) -> ParseResult<Expr> {
+    //     use TokenKind as T;
+
+    //     println!("Expr::parse_bare_name(_, {:?})", token.kind);
+    //     debug_assert_eq!(token.kind, T::Ident, "expected identifier");
+
+    //     input.ignore_many(TokenKind::Whitespace);
+    //     input.reset_peek();
+
+    //     // Depending on the next token, pick the type of variable name access.
+    //     let expr = match input.peek().map(|t| t.kind) {
+    //         Some(T::Eq) => {
+    //             // Name followed by equal sign is an assignment in an expression.
+    //             todo!("assignment expr");
+    //         }
+    //         Some(T::Dot) => {
+    //             // Name followed by a dot is treated as a member access.
+    //             input.next_token(); // consume dot
+
+    //             // Parse rest of possibly chain member access; insert first element later.
+    //             //
+    //             //     ┌─ Delimited::parse
+    //             //     ├─────┐
+    //             // foo.bar.baz
+    //             // │
+    //             // └ insert(0, ...)
+    //             //
+    //             let mut parts = Delimited::<Expr, MemberSeparator>::parse(input)?;
+
+    //             // Because the bare name and first dot have been consumed,
+    //             // they need to be put back.
+    //             parts.pairs.insert(
+    //                 0,
+    //                 Pair {
+    //                     item: Expr::NameAccess(NameAccess {
+    //                         ident: Ident {
+    //                             text: input.token_fragment(&token).into(),
+    //                             token,
+    //                         },
+    //                     }),
+    //                     delimiter: Some(MemberSeparator),
+    //                 },
+    //             );
+
+    //             todo!()
+    //         }
+    //         Some(T::LeftParen) => todo!("function call"),
+    //         Some(T::LeftBrace) => todo!("function block argument"),
+    //         Some(_) | None => {
+    //             // Simple name with one identifier
+    //             Expr::NameAccess(NameAccess {
+    //                 ident: Ident {
+    //                     text: input.token_fragment(&token).into(),
+    //                     token,
+    //                 },
+    //             })
+    //         }
+    //     };
+
+    //     Ok(expr)
+    // }
+
+    /// Parse call argument list.
+    ///
+    /// Cannot be parsed using [`Delimited`] because each element
+    /// is a whole recursive expression that needs to terminate on
+    /// right parentheses.
+    fn parse_call_arguments(input: &mut TokenStream) -> ParseResult<Vec<CallArg>> {
+        use TokenKind as T;
+
+        println!("Expr::parse_call_arguments(_)");
+
+        let mut args = vec![];
+
+        loop {
+            input.ignore_many(T::Whitespace);
+
+            match input.peek().map(|t| t.kind) {
+                Some(T::RightParen) | Some(T::EOF) | None => {
+                    // Termination condition
+                    break;
+                }
+                Some(T::Comma) => {
+                    // Skip separator
+                    input.next_token();
+                }
+                _ => {
+                    args.push(CallArg::Simple(Expr::parse(input)?));
+                }
+            }
+        }
+
+        Ok(args)
+    }
+}
+
+/// Utility methods for unwrapping expression.
+impl Expr {
+    pub fn expr_call(&self) -> Option<&Call> {
+        match self {
+            Expr::Call(e) => Some(e),
+            _ => None,
+        }
+    }
+
+    pub fn expr_name_access(&self) -> Option<&NameAccess> {
+        match self {
+            Expr::NameAccess(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
+impl CallArg {
+    pub fn simple(&self) -> Option<&Expr> {
+        match self {
+            CallArg::Simple(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
+impl Parse for CallArg {
+    type Output = Self;
+
+    fn parse(input: &mut TokenStream) -> ParseResult<Self::Output> {
+        println!("CallArg::parse(_)");
+        // TODO: Call argument types Named and Block
+        Expr::parse(input).map(CallArg::Simple)
+    }
+}
+
+impl Parse for CallSeparator {
+    type Output = Self;
+
+    fn parse(input: &mut TokenStream) -> ParseResult<Self::Output> {
+        println!("CallSeparator::parse(_)");
+        input.consume(TokenKind::Comma)?;
+        Ok(CallSeparator)
+    }
+}
+
+impl Parse for MemberSeparator {
+    type Output = Self;
+
+    fn parse(_input: &mut TokenStream) -> ParseResult<Self::Output> {
+        todo!()
     }
 }

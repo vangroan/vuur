@@ -53,13 +53,10 @@ impl Parse for Block {
                 Ok(Block { stmts })
             }
 
-            Some(kind) => Err(syntax_err(
-                format!(
-                    "unexpected token {}; block closing brace must be followed by newline, semicolon or eof.",
-                    kind
-                )
-                .to_owned(),
-            )),
+            Some(kind) => Err(syntax_err(format!(
+                "unexpected token {}; block closing brace must be followed by newline, semicolon or eof.",
+                kind
+            ))),
         }
     }
 }

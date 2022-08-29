@@ -7,7 +7,7 @@ use vuur_lexer::Lexer;
 mod block;
 mod cond;
 pub mod delim;
-mod expr;
+pub mod expr;
 pub mod func;
 pub mod ident;
 pub mod module;
@@ -16,7 +16,7 @@ pub mod stream;
 mod ty;
 
 pub fn parse_str(source: &str) -> ParseResult<VuurModule> {
-    let lexer = Lexer::from_str(source);
+    let lexer = Lexer::from_source(source);
     let mut stream = TokenStream::new(lexer);
     VuurModule::parse(&mut stream)
 }

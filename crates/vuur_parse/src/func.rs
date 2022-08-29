@@ -1,6 +1,6 @@
 //! Function declarations.
 
-use vuur_lexer::{Keyword, Token, TokenKind};
+use vuur_lexer::{Keyword, TokenKind};
 
 use crate::block::Block;
 use crate::delim::Delimited;

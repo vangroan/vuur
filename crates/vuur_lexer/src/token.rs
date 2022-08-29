@@ -22,6 +22,7 @@ pub enum TokenKind {
     Sub,          // -
     Mul,          // *
     Div,          // /
+    StarStar,     // **
     Eq,           // =
     EqEq,         // ==
     NotEq,        // !=
@@ -93,6 +94,7 @@ impl std::fmt::Display for TokenKind {
             T::Sub              => write!(f, "-"),
             T::Mul              => write!(f, "*"),
             T::Div              => write!(f, "/"),
+            T::StarStar         => write!(f, "**"),
             T::Eq               => write!(f, "="),
             T::EqEq             => write!(f, "=="),
             T::NotEq            => write!(f, "!="),

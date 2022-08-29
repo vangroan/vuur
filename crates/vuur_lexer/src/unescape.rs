@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 pub fn unescape_str(s: &str) -> String {
     let mut buf = String::new();
 

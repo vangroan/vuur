@@ -20,7 +20,7 @@ pub struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-    pub fn from_str(source: &'a str) -> Self {
+    pub fn from_source(source: &'a str) -> Self {
         let mut cursor = Cursor::from_str(source);
 
         // Initial state of the cursor is an non-existant EOF char,
@@ -308,7 +308,7 @@ mod test {
 
     #[test]
     fn test_lexer_whitespace() {
-        let mut lexer = Lexer::from_str(
+        let mut lexer = Lexer::from_source(
             r"
             ",
         );
@@ -320,7 +320,7 @@ mod test {
 
     #[test]
     fn test_remainder() {
-        let mut lexer = Lexer::from_str(r"a b c d e f");
+        let mut lexer = Lexer::from_source(r"a b c d e f");
         assert_eq!(lexer.next_token().kind, TokenKind::Ident); // a
         assert_eq!(lexer.next_token().kind, TokenKind::Whitespace);
         assert_eq!(lexer.next_token().kind, TokenKind::Ident); // b
@@ -344,7 +344,7 @@ mod test {
     #[test]
     fn test_lines() {
         // NOTE: Tests assume this rust file uses \n and not \n\r
-        let lexer = Lexer::from_str(
+        let lexer = Lexer::from_source(
             r"0
         1
         23",

@@ -126,7 +126,6 @@ impl<'a> TokenStream<'a> {
                 self.lexer.next();
             } else {
                 self.lexer.reset_peek();
-                return;
             }
         }
     }
@@ -151,10 +150,18 @@ impl<'a> TokenStream<'a> {
     /// next token.
     ///
     /// Returns `None` when lexing is done.
+    #[inline]
     pub fn peek(&mut self) -> Option<&Token> {
         self.lexer.peek()
     }
 
+    /// Return the current token kind without advancing the cursor.
+    #[inline]
+    pub fn peek_kind(&mut self) -> Option<TokenKind> {
+        self.lexer.peek().map(|token| token.kind)
+    }
+
+    #[inline]
     pub fn reset_peek(&mut self) {
         self.lexer.reset_peek()
     }
