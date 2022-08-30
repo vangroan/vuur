@@ -390,7 +390,12 @@ impl Expr {
                     input.consume(T::RightParen)?;
                     Expr::Call(Call { callee, args })
                 }
-                Some(T::Dot) => todo!("member access"),
+                Some(T::Dot) => {
+                    let delim = input.consume(T::Dot)?;
+                    let lhs = Box::new(expr);
+                    let rhs = Box::new(Expr::parse(input)?);
+                    Expr::MemberAccess(MemberAccess { delim, lhs, rhs })
+                }
                 Some(_) | None => {
                     println!("Expr::parse_name(_, _) - end");
                     // End
@@ -514,9 +519,25 @@ impl Expr {
         }
     }
 
+    /// Binary operation expression.
+    pub fn expr_bin_op(&self) -> Option<&BinaryOp> {
+        match self {
+            Expr::Binary(e) => Some(e),
+            _ => None,
+        }
+    }
+
     pub fn expr_name_access(&self) -> Option<&NameAccess> {
         match self {
             Expr::NameAccess(e) => Some(e),
+            _ => None,
+        }
+    }
+
+    /// Number literal expression.
+    pub fn expr_num_lit(&self) -> Option<&NumLit> {
+        match self {
+            Expr::Num(e) => Some(e),
             _ => None,
         }
     }
