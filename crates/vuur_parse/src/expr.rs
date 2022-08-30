@@ -393,7 +393,9 @@ impl Expr {
                 Some(T::Dot) => {
                     let delim = input.consume(T::Dot)?;
                     let lhs = Box::new(expr);
-                    let rhs = Box::new(Expr::parse(input)?);
+                    let rhs = Box::new(Expr::NameAccess(NameAccess {
+                        ident: Ident::parse(input)?,
+                    }));
                     Expr::MemberAccess(MemberAccess { delim, lhs, rhs })
                 }
                 Some(_) | None => {
