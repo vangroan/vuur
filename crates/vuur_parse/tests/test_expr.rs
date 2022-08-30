@@ -1,4 +1,4 @@
-use vuur_lexer::Lexer;
+use vuur_lexer::{Lexer, TokenKind};
 use vuur_parse::{
     expr::{BinaryOp, Expr},
     stream::TokenStream,
@@ -142,5 +142,83 @@ fn test_field_access() {
     let mut stream = TokenStream::new(lexer);
     let expr = Expr::parse(&mut stream).expect("expr parse");
     println!("{:#?}", expr);
-    todo!("evaluate lhs first")
+
+    let access2 = expr.expr_member_access().expect("member access");
+    assert_eq!(access2.delim.fragment(source), ".");
+    assert_eq!(access2.delim.kind, TokenKind::Dot);
+    assert_eq!(access2.name.text, "baz");
+
+    let access1 = access2.path.path().expect("member access");
+    assert_eq!(access1.delim.fragment(source), ".");
+    assert_eq!(access1.delim.kind, TokenKind::Dot);
+    assert_eq!(access1.path.name().expect("name").text, "foo");
+    assert_eq!(access1.name.text, "bar");
+}
+
+/// Simple assignment expression.
+#[test]
+fn test_assign() {
+    let source = "foobar  =  42";
+    let lexer = Lexer::from_source(source);
+    let mut stream = TokenStream::new(lexer);
+    let expr = Expr::parse(&mut stream).expect("expr parse");
+    println!("{:#?}", expr);
+
+    let assign = expr.expr_assign().expect("assign");
+    assert_eq!(assign.operator.fragment(source), "=");
+    assert_eq!(assign.operator.kind, TokenKind::Eq);
+    assert_eq!(assign.lhs.text, "foobar");
+    assert_eq!(
+        assign.rhs.expr_num_lit().expect("number literal").token.fragment(source),
+        "42"
+    );
+}
+
+/// Test assignment to a setter member, where the owner is a simple name.
+#[test]
+fn test_field_setter_name() {
+    let source = "foo.bar = 42";
+    let lexer = Lexer::from_source(source);
+    let mut stream = TokenStream::new(lexer);
+    let expr = Expr::parse(&mut stream).expect("expr parse");
+    println!("{:#?}", expr);
+
+    let assign = expr.expr_member_assign().expect("member assign");
+    assert_eq!(assign.path.name().expect("name").text, "foo");
+    assert_eq!(assign.delim.fragment(source), ".");
+    assert_eq!(assign.delim.kind, TokenKind::Dot);
+    assert_eq!(assign.name.text, "bar");
+    assert_eq!(assign.operator.fragment(source), "=");
+    assert_eq!(assign.operator.kind, TokenKind::Eq);
+    assert_eq!(
+        assign.rhs.expr_num_lit().expect("number literal").token.fragment(source),
+        "42"
+    );
+}
+
+/// Test assignment to a setter member, where the owner is another member access.
+#[test]
+fn test_field_setter_path() {
+    let source = "foo.bar.baz = 128";
+    let lexer = Lexer::from_source(source);
+    let mut stream = TokenStream::new(lexer);
+    let expr = Expr::parse(&mut stream).expect("expr parse");
+    println!("{:#?}", expr);
+
+    let assign = expr.expr_member_assign().expect("member assign");
+    let path = assign.path.path().expect("member access");
+    assert_eq!(path.delim.fragment(source), ".");
+    assert_eq!(path.delim.kind, TokenKind::Dot);
+    assert_eq!(path.path.name().expect("name").text, "foo");
+    assert_eq!(path.name.text, "bar");
+
+    assert_eq!(assign.delim.fragment(source), ".");
+    assert_eq!(assign.delim.kind, TokenKind::Dot);
+    assert_eq!(assign.name.text, "baz");
+    assert_eq!(assign.operator.fragment(source), "=");
+    assert_eq!(assign.operator.kind, TokenKind::Eq);
+    assert_eq!(
+        assign.rhs.expr_num_lit().expect("number literal").token.fragment(source),
+        "128"
+    );
 }

@@ -133,9 +133,11 @@ pub enum Expr {
     Unknown,
     Unary(UnaryOp),
     Binary(BinaryOp),
+    Assign(Assign),
     Num(NumLit),
     NameAccess(NameAccess),
     MemberAccess(MemberAccess),
+    MemberAssign(MemberAssign),
     Call(Call),
 }
 
@@ -160,10 +162,30 @@ pub struct BinaryOp {
     pub rhs: Box<Expr>,
 }
 
+/// Assignment expression.
+///
+/// A bit special relative to out usual binary operation.
+///
+/// Left-hand-side of this expression is an l-value, and cannot be evaluated
+/// to a value like a regular r-value expression. It only produces an address
+/// to be used for a store instruction.
+#[derive(Debug)]
+pub struct Assign {
+    pub operator: Token,
+    pub lhs: Ident,
+    pub rhs: Box<Expr>,
+}
+
 /// Variable accessed/read.
 #[derive(Debug)]
 pub struct NameAccess {
     pub ident: Ident,
+}
+
+#[derive(Debug)]
+pub enum MemberPath {
+    Name(Ident),
+    Path(Box<MemberAccess>),
 }
 
 /// Member accessed/read.
@@ -174,7 +196,24 @@ pub struct NameAccess {
 #[derive(Debug)]
 pub struct MemberAccess {
     pub delim: Token,
-    pub lhs: Box<Expr>,
+    pub path: MemberPath,
+    pub name: Ident,
+}
+
+/// Member setter assignment.
+///
+/// ```not-rust
+/// foo.bar = 42
+/// ```
+#[derive(Debug)]
+pub struct MemberAssign {
+    /// Either the owner of the member, or a chain of [`MemberAccess`].
+    pub path: MemberPath,
+    // Delimiter separating path and member name.
+    pub delim: Token,
+    /// Member name being accessed
+    pub name: Ident,
+    pub operator: Token,
     pub rhs: Box<Expr>,
 }
 
@@ -379,6 +418,43 @@ impl Expr {
             input.ignore_many(TokenKind::Whitespace);
 
             expr = match input.peek().map(|t| t.kind) {
+                Some(T::Eq) => {
+                    // Assignment expression.
+                    //
+                    // LHS of assignment is special, because it is an l-value
+                    // and does not evaluate to a resulting value.
+                    //
+                    // When we encounter an equality token we need to "rewind"
+                    // and change the previous expression.
+                    match expr {
+                        Expr::NameAccess(NameAccess { ident }) => {
+                            // Simple assignment where the LHS is a variable name.
+                            // foobar = 42
+                            let operator = input.consume(T::Eq)?;
+                            let lhs = ident;
+                            let rhs = Expr::parse(input).map(Box::new)?;
+                            Expr::Assign(Assign { operator, lhs, rhs })
+                        }
+                        Expr::MemberAccess(MemberAccess { delim, path, name }) => {
+                            // Member setter where the LHS is a member of an object.
+                            // foo.bar.baz = 42
+                            let operator = input.consume(T::Eq)?;
+                            let rhs = Expr::parse(input).map(Box::new)?;
+                            Expr::MemberAssign(MemberAssign {
+                                path,
+                                delim,
+                                name,
+                                operator,
+                                rhs,
+                            })
+                        }
+                        _ => {
+                            // Previous expression is a type that is not
+                            // supported as the LHS of an assignment.
+                            return Err(syntax_err("lhs of assignment must be identifier or member path"));
+                        }
+                    }
+                }
                 Some(T::LeftBracket) => todo!("parse subscript"),
                 Some(T::LeftParen) => {
                     println!("Expr::parse_name(_, _) - parse call");
@@ -392,11 +468,17 @@ impl Expr {
                 }
                 Some(T::Dot) => {
                     let delim = input.consume(T::Dot)?;
-                    let lhs = Box::new(expr);
-                    let rhs = Box::new(Expr::NameAccess(NameAccess {
-                        ident: Ident::parse(input)?,
-                    }));
-                    Expr::MemberAccess(MemberAccess { delim, lhs, rhs })
+                    let lhs = match expr {
+                        Expr::NameAccess(NameAccess { ident }) => MemberPath::Name(ident),
+                        Expr::MemberAccess(member_access) => MemberPath::Path(Box::new(member_access)),
+                        _ => return Err(syntax_err("member access not valid")),
+                    };
+                    let rhs = Ident::parse(input)?;
+                    Expr::MemberAccess(MemberAccess {
+                        delim,
+                        path: lhs,
+                        name: rhs,
+                    })
                 }
                 Some(_) | None => {
                     println!("Expr::parse_name(_, _) - end");
@@ -529,9 +611,31 @@ impl Expr {
         }
     }
 
+    /// Assignment operation expression.
+    pub fn expr_assign(&self) -> Option<&Assign> {
+        match self {
+            Expr::Assign(e) => Some(e),
+            _ => None,
+        }
+    }
+
     pub fn expr_name_access(&self) -> Option<&NameAccess> {
         match self {
             Expr::NameAccess(e) => Some(e),
+            _ => None,
+        }
+    }
+
+    pub fn expr_member_access(&self) -> Option<&MemberAccess> {
+        match self {
+            Expr::MemberAccess(e) => Some(e),
+            _ => None,
+        }
+    }
+
+    pub fn expr_member_assign(&self) -> Option<&MemberAssign> {
+        match self {
+            Expr::MemberAssign(e) => Some(e),
             _ => None,
         }
     }
@@ -541,6 +645,22 @@ impl Expr {
         match self {
             Expr::Num(e) => Some(e),
             _ => None,
+        }
+    }
+}
+
+impl MemberPath {
+    pub fn name(&self) -> Option<&Ident> {
+        match self {
+            MemberPath::Name(ident) => Some(ident),
+            MemberPath::Path(_) => None,
+        }
+    }
+
+    pub fn path(&self) -> Option<&MemberAccess> {
+        match self {
+            MemberPath::Path(member_access) => Some(&*member_access),
+            MemberPath::Name(_) => None,
         }
     }
 }
