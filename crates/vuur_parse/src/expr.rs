@@ -253,9 +253,6 @@ pub enum CallArg {
     Block(Block),
 }
 
-#[derive(Debug)]
-pub struct CallSeparator;
-
 /// Seperator for member access.
 #[derive(Debug)]
 pub struct MemberSeparator;
@@ -672,33 +669,5 @@ impl CallArg {
             CallArg::Simple(e) => Some(e),
             _ => None,
         }
-    }
-}
-
-impl Parse for CallArg {
-    type Output = Self;
-
-    fn parse(input: &mut TokenStream) -> ParseResult<Self::Output> {
-        println!("CallArg::parse(_)");
-        // TODO: Call argument types Named and Block
-        Expr::parse(input).map(CallArg::Simple)
-    }
-}
-
-impl Parse for CallSeparator {
-    type Output = Self;
-
-    fn parse(input: &mut TokenStream) -> ParseResult<Self::Output> {
-        println!("CallSeparator::parse(_)");
-        input.consume(TokenKind::Comma)?;
-        Ok(CallSeparator)
-    }
-}
-
-impl Parse for MemberSeparator {
-    type Output = Self;
-
-    fn parse(_input: &mut TokenStream) -> ParseResult<Self::Output> {
-        todo!()
     }
 }
