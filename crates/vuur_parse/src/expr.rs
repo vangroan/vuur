@@ -189,10 +189,30 @@ pub enum MemberPath {
     Path(Box<MemberAccess>),
 }
 
-/// Member accessed/read.
+/// Member of object accessed/read.
 ///
 /// ```not-rust
 /// foo.bar
+///
+///       delim:"."
+///     ┌──────┴──────┐
+///     │             │
+/// path:"foo"    name:"bar"
+/// ```
+///
+/// `path` can either be a simple identifier, or a
+/// tree of futher member access nodes forming a chain.
+///
+/// ```non-rust
+/// foo.bar.baz
+///
+///            delim:"."
+///           ┌─────┴─────┐
+///           │           │
+///          path     name:"baz"
+///           │
+///     ┌─────┴─────┐
+/// path:"foo"  name:"bar"
 /// ```
 #[derive(Debug)]
 pub struct MemberAccess {
