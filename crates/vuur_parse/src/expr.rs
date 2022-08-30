@@ -194,7 +194,7 @@ pub enum MemberPath {
 /// ```not-rust
 /// foo.bar
 ///
-///       delim:"."
+///        delim:"."
 ///     ┌──────┴──────┐
 ///     │             │
 /// path:"foo"    name:"bar"
@@ -206,14 +206,19 @@ pub enum MemberPath {
 /// ```non-rust
 /// foo.bar.baz
 ///
-///            delim:"."
+///             delim:"."
 ///           ┌─────┴─────┐
 ///           │           │
 ///          path     name:"baz"
 ///           │
+///       delim:"."
 ///     ┌─────┴─────┐
+///     │           │
 /// path:"foo"  name:"bar"
 /// ```
+///
+/// Parts to the left are deeper down the tree, so that they
+/// are evaluated first.
 #[derive(Debug)]
 pub struct MemberAccess {
     pub delim: Token,
