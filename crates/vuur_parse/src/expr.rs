@@ -55,6 +55,7 @@ impl Precedence {
             T::Dot | T::LeftParen | T::LeftBracket => Precedence::Call,
             // Terminators
             T::RightParen | T::RightBracket => Precedence::None,
+            T::Comma => Precedence::None,
             _ => Precedence::None,
         }
     }
