@@ -136,6 +136,7 @@ pub enum Expr {
     Binary(BinaryOp),
     Assign(Assign),
     Num(NumLit),
+    Group(Group),
     NameAccess(NameAccess),
     MemberAccess(MemberAccess),
     MemberAssign(MemberAssign),
@@ -146,6 +147,12 @@ pub enum Expr {
 #[derive(Debug)]
 pub struct NumLit {
     pub token: Token,
+}
+
+/// Grouped expression between parentises "(expr)"
+#[derive(Debug)]
+pub struct Group {
+    pub expr: Box<Expr>,
 }
 
 /// Arithmetic operation with an expression on the right side.
@@ -352,6 +359,7 @@ impl Expr {
 
         match token.kind {
             T::Number => Expr::parse_number_literal(token).map(Expr::Num),
+            T::LeftParen => Expr::parse_group(input).map(Expr::Group),
             T::Ident => Expr::parse_name(input, token),
             T::Keyword(K::Func) => todo!("anonymous function"),
             T::Sub => {
@@ -414,6 +422,14 @@ impl Expr {
     fn parse_number_literal(token: Token) -> ParseResult<NumLit> {
         // TODO: Different number formats. binary, octal, decimal, hex, scientific
         Ok(NumLit { token })
+    }
+
+    /// Parse expression contained in parentheses.
+    fn parse_group(input: &mut TokenStream) -> ParseResult<Group> {
+        println!("Expr::parse_group(_)");
+        let expr = Box::new(Expr::parse(input)?);
+        input.consume(TokenKind::RightParen)?;
+        Ok(Group { expr })
     }
 
     /// Parse a variable name.
@@ -667,6 +683,13 @@ impl Expr {
     pub fn expr_num_lit(&self) -> Option<&NumLit> {
         match self {
             Expr::Num(e) => Some(e),
+            _ => None,
+        }
+    }
+
+    pub fn expr_group(&self) -> Option<&Group> {
+        match self {
+            Expr::Group(e) => Some(e),
             _ => None,
         }
     }

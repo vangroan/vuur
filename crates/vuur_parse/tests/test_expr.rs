@@ -5,6 +5,48 @@ use vuur_parse::{
     Parse,
 };
 
+/// Test parentheses groups.
+#[test]
+fn test_parentheses_group() {
+    let source = "(1 - 2) * (3 + 4)";
+    let lexer = Lexer::from_source(source);
+    let mut stream = TokenStream::new(lexer);
+    let expr = Expr::parse(&mut stream).unwrap();
+    println!("{:#?}", expr);
+
+    let mul_op = expr.expr_bin_op().expect("binary op");
+    assert_eq!(mul_op.operator.fragment(source), "*");
+    assert_eq!(mul_op.operator.kind, TokenKind::Mul);
+
+    {
+        let left_op = mul_op.lhs.expr_group().expect("group").expr.expr_bin_op().expect("binary op");
+        assert_eq!(left_op.operator.fragment(source), "-");
+        assert_eq!(left_op.operator.kind, TokenKind::Sub);
+        assert_eq!(
+            left_op.lhs.expr_num_lit().expect("number literal").token.fragment(source),
+            "1"
+        );
+        assert_eq!(
+            left_op.rhs.expr_num_lit().expect("number literal").token.fragment(source),
+            "2"
+        );
+    }
+
+    {
+        let right_op = mul_op.rhs.expr_group().expect("group").expr.expr_bin_op().expect("binary op");
+        assert_eq!(right_op.operator.fragment(source), "+");
+        assert_eq!(right_op.operator.kind, TokenKind::Add);
+        assert_eq!(
+            right_op.lhs.expr_num_lit().expect("number literal").token.fragment(source),
+            "3"
+        );
+        assert_eq!(
+            right_op.rhs.expr_num_lit().expect("number literal").token.fragment(source),
+            "4"
+        );
+    }
+}
+
 /// Function call with zero agruments
 #[test]
 fn test_empty_call_args() {
