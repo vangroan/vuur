@@ -2,16 +2,18 @@
 use crate::module::VuurModule;
 use crate::stream::TokenError;
 use crate::stream::TokenStream;
+use vuur_lexer::span::BytePos;
 use vuur_lexer::Lexer;
 
 mod block;
 mod cond;
 pub mod delim;
+pub mod error;
 pub mod expr;
 pub mod func;
 pub mod ident;
 pub mod module;
-mod stmt;
+pub mod stmt;
 pub mod stream;
 mod ty;
 
@@ -40,6 +42,14 @@ pub enum ParseError {
 #[inline(always)]
 pub(crate) fn syntax_err(msg: impl ToString) -> ParseError {
     ParseError::Syntax { msg: msg.to_string() }
+}
+
+impl ParseError {
+    /// Byte position (offset) and size of token in source
+    /// related to this error.
+    pub fn span(&self) -> (BytePos, u32) {
+        todo!("span for syntax error")
+    }
 }
 
 impl std::fmt::Display for ParseError {

@@ -2,5 +2,7 @@
 members = [
     "crates/vuur_lexer",
     "crates/vuur_parse",
+    "crates/vuur_compile",
+    "crates/vuur_vm",
     "crates/vuur",
 ]

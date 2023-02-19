@@ -18,6 +18,8 @@ pub enum TokenKind {
     LeftBrace,    // {
     RightBrace,   // }
     Dot,          // .
+    DotDot,       // ..
+    Ellipses,     // ...
     Add,          // +
     Sub,          // -
     Mul,          // *
@@ -90,6 +92,8 @@ impl std::fmt::Display for TokenKind {
             T::LeftBrace        => write!(f, "{{"),
             T::RightBrace       => write!(f, "}}"),
             T::Dot              => write!(f, "."),
+            T::DotDot           => write!(f, ".."),
+            T::Ellipses         => write!(f, "..."),
             T::Add              => write!(f, "+"),
             T::Sub              => write!(f, "-"),
             T::Mul              => write!(f, "*"),

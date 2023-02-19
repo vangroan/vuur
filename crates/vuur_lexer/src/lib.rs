@@ -23,7 +23,7 @@ impl<'a> Lexer<'a> {
     pub fn from_source(source: &'a str) -> Self {
         let mut cursor = Cursor::from_str(source);
 
-        // Initial state of the cursor is an non-existant EOF char,
+        // Initial state of the cursor is a non-existant EOF char,
         // but the initial state of the lexer should be a valid
         // token starting character.
         //
@@ -350,6 +350,8 @@ mod test {
         23",
         );
 
+        assert_eq!(lexer.source().len(), 22);
+
         // (kind, offset, size)
         #[rustfmt::skip]
         let expected: Vec<(TokenKind, u32, u32)> = vec![
@@ -360,7 +362,7 @@ mod test {
             (TokenKind::Newline,    11, 1),
             (TokenKind::Whitespace, 12, 8),
             (TokenKind::Number,     20, 2), // 23
-            (TokenKind::EOF,        22, 0),
+            (TokenKind::EOF,        22, 0), // outside string
         ];
 
         for (token, exp) in lexer.into_iter().zip(expected.into_iter()) {
