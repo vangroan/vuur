@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use vuur_compile::bytecode::instruction as ops;
+use vuur_compile::bytecode::opcodes as ops;
 use vuur_compile::constants::CHUNK_HEADER_RESERVED;
 use vuur_compile::Chunk;
 
@@ -81,8 +81,8 @@ impl Fiber {
 
     pub fn run(&mut self, chunk: &Chunk) {
         'eval: loop {
-            let instruction = &chunk.code()[self.ip..self.ip + STRIDE];
-            debug_assert!(instruction.len() == 4);
+            let op = chunk.code()[self.ip];
+
             self.print_ip();
             print!(
                 "{:02X} {:02X} {:02X} {:02X} ",

@@ -16,7 +16,7 @@ fn test_basic_arithmetic() {
         println!("{}", buf);
 
         let mut file = File::create("./test_chunk.bin").unwrap();
-        file.write(chunk.code()).expect("write chunk binary file");
+        // file.write(chunk.code()).expect("write chunk binary file");
         file.flush().expect("flush chunk binary file");
         drop(file);
 

@@ -1,158 +1,160 @@
-use std::collections::HashMap;
-
 use vuur_parse::expr::{Expr, OperatorKind};
 use vuur_parse::module::VuurModule;
 use vuur_parse::stmt::{DefStmt, SimpleStmt};
 
-use crate::bytecode::{Instruction, Register, RegisterCount};
-use crate::chunk::Chunk;
+use crate::bytecode::opcodes::{self, OpCode};
+use crate::chunk::{Chunk, ChunkHeader};
+use crate::codegen::Codegen;
 use crate::constants::*;
+use crate::error::{CompileError, ErrorKind, Result};
 use crate::limits::*;
-use crate::{bytecode::ByteOp, codegen::Codegen};
 
 // TODO: Replace String error with proper error type
 
-/// Executable chunk of bytecode.
-#[derive(Debug)]
-pub struct BytecodeChunk {
-    pub(crate) bytecode: Vec<ByteOp>,
-}
-
-impl BytecodeChunk {
-    pub fn disassemble<W>(&self, f: &mut W) -> std::fmt::Result
-    where
-        W: std::fmt::Write,
-    {
-        for op in &self.bytecode {
-            match op {
-                ByteOp::Noop => writeln!(f, "\tnoop")?,
-                ByteOp::Add_I32 { dest, a, b } => writeln!(f, "\tadd r{}, r{} r{}", dest, a, b)?,
-                ByteOp::LoadConst { dest, konst } => writeln!(f, "\tloadk r{}, c{}", dest, konst)?,
-                _ => todo!("disassembly of opcode {:?} not implemented yet", op),
-            }
-        }
-
-        Ok(())
-    }
-}
-
-#[derive(Debug, PartialEq)]
-enum ConstValue {
-    I32(i32),
-    F32(f32),
-    Bool(bool),
-}
-
-impl ConstValue {
-    /// Size of constant value in bytes.
-    fn byte_size(&self) -> usize {
-        match self {
-            Self::I32(_) => 4,
-            Self::F32(_) => 4,
-            Self::Bool(_) => 1,
-        }
-    }
-}
-
-/// State of registers, to track allocation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum RegisterAlloc {
-    /// Register is open and available.
-    Vacant = 0,
-    /// Register contains value that's intended to be used by a later bytecode.
-    Occupied,
-    /// Register contains value that will no longer be used.
-    Orphaned,
-}
-
-impl RegisterAlloc {
-    /// Checks whether the register is available for allocation.
-    fn is_available(&self) -> bool {
-        match self {
-            Self::Vacant | Self::Orphaned => true,
-            Self::Occupied => false,
-        }
-    }
-}
-
 /// Executable block
-struct CallInfo {
+struct FuncState {
     /// Name of the callable.
     ///
     /// For functions this is the function name, for the
     /// top level anonymous module function this would be `None`.
     name: Option<String>,
-    /// Offset of bytecode in the chunk where the instructions
-    /// for the scope starts.
-    code_offset: usize,
-    /// Offset of stack base, index pointing into the
-    /// operand stack where the current activation frame's
-    /// registers starts.
-    stack_offset: usize,
     /// Unnamed scalar constant values.
-    constants: Vec<ConstValue>,
+    constants: ConstantTable,
     /// String constant values.
     strings: Vec<String>,
     /// Local variable values, including the function's parameters.
     locals: Vec<String>,
-    /// Temporary values.
-    temps: Vec<()>,
+    bytecode: Vec<u32>,
 }
 
-impl CallInfo {
-    fn insert_constant(&mut self, konst: ConstValue) -> usize {
-        match self.constants.iter().position(|el| el == &konst) {
+impl FuncState {
+    fn add_constant(&mut self, konst: ConstValue) -> usize {
+        self.constants.add_constant(konst)
+    }
+
+    fn emit_simple(&mut self, op: OpCode) {
+        self.bytecode.push(op as u32);
+    }
+
+    fn emit_k(&mut self, op: OpCode, k: u32) {
+        debug_assert!(k <= 0xFFFFFF, "instruction format only supports 24-bit argument");
+        let prefix = op as u32;
+        let data = (k as u32 & 0xFFFFFF) << 8;
+        self.bytecode.push(prefix | data);
+    }
+
+    fn emit_a(&mut self, op: OpCode, a: i32) {
+        debug_assert!(
+            a <= INSTRUCTION_A_MAX,
+            "instruction format only supports 24-bit argument"
+        );
+        let prefix = op as u32;
+        let data = (a as u32 & 0xFFFFFF) << 8;
+        self.bytecode.push(prefix | data);
+    }
+}
+
+impl Default for FuncState {
+    fn default() -> Self {
+        Self {
+            name: None,
+            constants: ConstantTable::new(),
+            strings: Vec::new(),
+            locals: Vec::new(),
+            bytecode: Vec::new(),
+        }
+    }
+}
+
+struct ConstantTable {
+    values: Vec<ConstValue>,
+    next_index: usize,
+}
+
+impl ConstantTable {
+    fn new() -> Self {
+        Self {
+            values: vec![],
+            next_index: 0,
+        }
+    }
+
+    fn add_constant(&mut self, value: ConstValue) -> usize {
+        match self.values.iter().position(|el| el == &value) {
             Some(index) => index,
             None => {
-                let next_index = self.constants.len();
-                self.constants.push(konst);
+                let next_index = self.next_index;
+                self.next_index += value.encoded_size();
+                self.values.push(value);
                 next_index
             }
         }
     }
+
+    fn len(&self) -> usize {
+        self.next_index
+    }
+
+    fn is_empty(&self) -> bool {
+        self.next_index == 0
+    }
 }
 
-impl Default for CallInfo {
-    fn default() -> Self {
-        Self {
-            name: None,
-            code_offset: 0,
-            stack_offset: 0,
-            constants: Vec::new(),
-            strings: Vec::new(),
-            locals: Vec::new(),
-            temps: Vec::new(),
+#[derive(Debug, PartialEq, Clone, Copy)]
+enum ConstValue {
+    I32(i32),
+    F32(f32),
+    I64(i64),
+    F64(f64),
+    Bool(bool),
+}
+
+impl ConstValue {
+    /// Size of constant value when encoded into u32.
+    fn encoded_size(&self) -> usize {
+        match self {
+            Self::I32(_) | Self::F32(_) => 1,
+            Self::I64(_) | Self::F64(_) => 2,
+            Self::Bool(_) => 1,
+        }
+    }
+
+    fn to_bits(&self) -> u32 {
+        match *self {
+            Self::I32(val) => val as u32,
+            Self::F32(val) => val.to_bits(),
+            _ => 0,
+        }
+    }
+
+    fn to_bits2(&self) -> [u32; 2] {
+        match *self {
+            _ => todo!(),
         }
     }
 }
 
+#[deprecated]
 #[doc(hidden)]
 pub fn write_header(chunk: &mut Chunk) {
-    chunk.code.push(CHUNK_START_BYTE);
-    chunk.code.extend_from_slice(CHUNK_HEADER);
-    chunk.code.push(CHUNK_VERSION);
-    chunk.code.push(CHUNK_ENDIAN_LIT);
-    chunk.code.push(CHUNK_SIZE_32);
+    // chunk.code.push(CHUNK_START_BYTE);
+    // chunk.code.extend_from_slice(CHUNK_HEADER);
+    // chunk.code.push(CHUNK_VERSION);
+    // chunk.code.push(CHUNK_ENDIAN_LIT);
+    // chunk.code.push(CHUNK_SIZE_32);
 
-    // File format reserves bytes for future use.
-    for _ in chunk.code.len()..CHUNK_HEADER_RESERVED {
-        chunk.code.push(0);
-    }
+    // // File format reserves bytes for future use.
+    // for _ in chunk.code.len()..CHUNK_HEADER_RESERVED {
+    //     chunk.code.push(0);
+    // }
 }
 
 /// Code generator that outputs interpreter bytecode.
 pub struct BytecodeCodegen {
     /// Result buffer of generated bytecode
-    code: Vec<ByteOp>,
     chunk: Chunk,
-    /// Global module level variables.
-    globals: HashMap<(), ()>,
-    /// Bookkeeping for tracking register usage.
-    registers: Box<[RegisterAlloc; RegisterCount]>,
     /// Call stack info.
-    frames: Vec<CallInfo>,
-    /// Operand stack to track instruction evaluation.
-    operands: Vec<Register>,
+    funcs: Vec<FuncState>,
     /// Mapping of bytecode to original source line.
     ///
     /// The index in the vector is equal to the bytecode's offset
@@ -160,19 +162,16 @@ pub struct BytecodeCodegen {
     /// the source code text, starting at 1.
     ///
     /// Used to add source text information when disassembling.
-    lines: Vec<usize>,
+    // TODO: Source mapping
+    _lines: Vec<usize>,
 }
 
 impl BytecodeCodegen {
     pub fn new() -> Self {
         Self {
-            code: Vec::new(),
             chunk: Chunk::default(),
-            globals: HashMap::new(),
-            registers: Box::new([RegisterAlloc::Vacant; RegisterCount]),
-            frames: Vec::with_capacity(100),
-            operands: Vec::with_capacity(RegisterCount),
-            lines: Vec::new(),
+            funcs: Vec::with_capacity(64),
+            _lines: Vec::new(),
         }
     }
 
@@ -188,38 +187,7 @@ impl BytecodeCodegen {
     /// Reset internal state of code generator to a clean slate,
     /// ready for another code generation run.
     fn reset(&mut self) {
-        self.code.clear();
-        self.globals.clear();
-        self.operands.clear();
-        for register in self.registers.iter_mut() {
-            *register = RegisterAlloc::Vacant;
-        }
-    }
-
-    fn alloc_register(&mut self) -> Option<usize> {
-        self.registers.iter().position(RegisterAlloc::is_available).and_then(|index| {
-            // Reserve register
-            self.registers[index] = RegisterAlloc::Occupied;
-
-            Some(index)
-        })
-    }
-
-    fn dealloc_register(&mut self, register_address: u8) {
-        let index = register_address as usize;
-        match self.registers[index] {
-            RegisterAlloc::Occupied => self.registers[index] = RegisterAlloc::Orphaned,
-            // TODO: Does the vacant case need to panic in debug mode to ensure an invariant?
-            RegisterAlloc::Vacant | RegisterAlloc::Orphaned => { /* Do nothing */ }
-        }
-    }
-
-    fn stack_cursor(&self) -> usize {
-        if self.operands.is_empty() {
-            0
-        } else {
-            self.operands.len() - 1
-        }
+        *self = BytecodeCodegen::new();
     }
 
     /// Byte offset of next instruction.
@@ -227,43 +195,73 @@ impl BytecodeCodegen {
         self.chunk.code.len()
     }
 
-    fn top_frame_mut(&mut self) -> &mut CallInfo {
+    fn top_frame_mut(&mut self) -> &mut FuncState {
         // Create default function to make this infallible.
-        if self.frames.is_empty() {
-            self.frames.push(CallInfo::default());
-            &mut self.frames[0]
+        if self.funcs.is_empty() {
+            self.funcs.push(FuncState::default());
+            &mut self.funcs[0]
         } else {
-            self.frames.last_mut().unwrap()
+            self.funcs.last_mut().unwrap()
         }
     }
 
     fn write_header(&mut self) {
-        self.chunk.code.push(CHUNK_START_BYTE);
-        self.chunk.code.extend_from_slice(CHUNK_HEADER);
-        self.chunk.code.push(CHUNK_VERSION);
+        // self.chunk.code.push(CHUNK_START_BYTE);
+        // self.chunk.code.extend_from_slice(CHUNK_HEADER);
+        // self.chunk.code.push(CHUNK_VERSION);
 
-        // File format reserves bytes for future use.
-        for _ in self.chunk.code.len()..CHUNK_HEADER_RESERVED {
-            self.chunk.code.push(0);
+        // // File format reserves bytes for future use.
+        // for _ in self.chunk.code.len()..CHUNK_HEADER_RESERVED {
+        //     self.chunk.code.push(0);
+        // }
+        let header = ChunkHeader {
+            version: CHUNK_VERSION,
+            endianess: CHUNK_ENDIAN_LIT,
+            size_t: CHUNK_SIZE_32,
+        };
+        self.chunk.header = header;
+    }
+
+    /// Pops the top function state and emits it into the chunk bytecode.
+    fn finish_func(&mut self) -> Result<()> {
+        match self.funcs.pop() {
+            Some(func) => {
+                // Emit function def header
+                self.chunk.emit_simple(opcodes::FUNC);
+
+                // Write constants
+                self.chunk.emit_data(func.constants.len() as u32);
+                for konst in &func.constants.values {
+                    self.chunk.emit_data(konst.to_bits());
+                }
+
+                // Write bytecode instructions
+                self.chunk.code.extend_from_slice(&func.bytecode);
+
+                Ok(())
+            }
+            None => Err(CompileError::new(
+                ErrorKind::Compiler,
+                "failed to finalize function: no current function being compiled",
+            )),
         }
     }
 
-    fn compile_module(&mut self, module: &VuurModule) -> Result<(), String> {
-        // Top level of a module is an anonymous function
+    fn compile_module(&mut self, module: &VuurModule) -> Result<()> {
         self.write_header();
 
-        self.frames.push(CallInfo {
-            code_offset: self.next_offset(),
-            ..CallInfo::default()
-        });
+        // Top level of a module is an anonymous function
+        self.funcs.push(FuncState { ..FuncState::default() });
 
         self.compile_stmts(&module.stmts)?;
         self.compile_return();
 
+        self.finish_func();
+
         Ok(())
     }
 
-    fn compile_stmts(&mut self, stmts: &[DefStmt]) -> Result<(), String> {
+    fn compile_stmts(&mut self, stmts: &[DefStmt]) -> Result<()> {
         for def_stmt in stmts {
             match def_stmt {
                 DefStmt::Simple(stmt) => {
@@ -280,84 +278,50 @@ impl BytecodeCodegen {
         Ok(())
     }
 
-    fn compile_expr(&mut self, expr: &Expr) -> Result<(), String> {
+    fn compile_expr(&mut self, expr: &Expr) -> Result<()> {
         match expr {
             // Number literal becomes a constant with no name.
             Expr::Num(num) => {
                 let scope = self.top_frame_mut();
-
-                // TODO: If the literal is small enough, inline it into an immediate instruction.
                 let lit = num.value;
 
-                // TODO: Floats
-                let index = scope.insert_constant(ConstValue::I32(lit));
+                // If the literal is small enough, inline it into an immediate instruction.
+                if lit >= 0 && lit <= INSTRUCTION_A_MAX {
+                    scope.emit_a(opcodes::PUSH_CONST_IMM, lit);
+                } else {
+                    // Integer is too large to be inlined into the bytecode.
+                    // Add it to the constant table.
+                    // TODO: Floats
+                    let index = scope.add_constant(ConstValue::I32(lit));
 
-                if index > MAX_CONSTANTS as usize {
-                    return Err("maximum function constants exceeded".to_owned());
+                    if index > MAX_CONSTANTS {
+                        return Err(CompileError::new(
+                            ErrorKind::Compiler,
+                            "maximum function constants exceeded",
+                        ));
+                    }
+
+                    // Emit
+                    scope.emit_k(opcodes::PUSH_CONST, index as u32);
                 }
-
-                // Emit
-                self.chunk.emit_a(Instruction::PushConst, index as i32);
-                // self.chunk.code.push(Instruction::PushConst as u8);
-
-                // let parts = index.to_le_bytes();
-                // eprintln!("const parts {:?}", parts);
-                // self.chunk.code.push(parts[0]);
-                // self.chunk.code.push(0);
-                // self.chunk.code.push(0);
-
-                // // TODO: Support 32-bit and 64-bit number literals
-                // let scope = self.top_frame_mut();
-
-                // // TODO: Small constants can be inlined into bytecode using immediate instructions
-                // let lit = num.value;
-
-                // // Push unnamed constant
-                // scope.constants.push(ConstValue::I32(lit));
-                // let const_index = scope.constants.len() - 1;
-                // if const_index as u8 > std::u8::MAX {
-                //     return Err("constant index overflow".to_owned());
-                // }
-
-                // // Push constant onto operand stack.
-                // let dest = self
-                //     .alloc_register()
-                //     .map(|register_index| register_index as Register)
-                //     .ok_or("all registers occupied")?;
-                // self.operands.push(dest);
-
-                // // Emit
-                // self.code.push(ByteOp::LoadConst {
-                //     dest,
-                //     konst: const_index as u8,
-                // })
             }
             Expr::Binary(binary) => {
                 self.compile_expr(&binary.lhs)?;
                 self.compile_expr(&binary.rhs)?;
 
+                let scope = self.top_frame_mut();
+
                 match binary.operator.kind {
                     OperatorKind::Add => {
-                        self.chunk.emit_simple(Instruction::Add_I32);
-                        // let b = self.operands.pop().ok_or("RHS register address not on operand stack")?;
-                        // let a = self.operands.pop().ok_or("LHS register address not on operand stack")?;
-
-                        // self.dealloc_register(b);
-                        // self.dealloc_register(a);
-
-                        // let dest = self
-                        //     .alloc_register()
-                        //     .ok_or("failed to allocate register for binary operation")?;
-
-                        // if dest >= RegisterCount {
-                        //     return Err("register overflow".to_owned());
-                        // }
-
-                        // let dest = dest as Register;
-                        // self.code.push(ByteOp::Add_I32 { dest, a, b })
+                        scope.emit_simple(opcodes::ADD_I32);
+                        // self.chunk.emit_simple(Instruction::Add_I32);
+                    }
+                    OperatorKind::Sub => {
+                        scope.emit_simple(opcodes::SUB_I32);
                     }
                     OperatorKind::Mul => {
-                        self.chunk.emit_simple(Instruction::Mul_I32);
+                        scope.emit_simple(opcodes::MUL_I32);
+                        // self.chunk.emit_simple(Instruction::Mul_I32);
                     }
                     _ => todo!("operator kind {:?} not implemented yet", binary.operator.kind),
                 }
@@ -367,7 +331,7 @@ impl BytecodeCodegen {
             }
             Expr::NameAccess(_) => {
                 eprint!("name access not implemented");
-                self.chunk.emit_simple(Instruction::Noop);
+                self.top_frame_mut().emit_simple(opcodes::NOOP);
             }
             _ => todo!(),
         }
@@ -376,7 +340,7 @@ impl BytecodeCodegen {
     }
 
     fn compile_return(&mut self) {
-        self.chunk.emit_simple(Instruction::Return);
+        self.top_frame_mut().emit_simple(opcodes::RETURN)
     }
 }
 
@@ -384,25 +348,11 @@ impl Codegen for BytecodeCodegen {
     type Input = VuurModule;
     type Output = Chunk;
 
-    fn compile(&mut self, module: &Self::Input) -> Result<Self::Output, String> {
+    fn compile(&mut self, module: &Self::Input) -> Result<Self::Output> {
         self.compile_module(module)?;
 
         Ok(self.take())
     }
-}
-
-/// Definition pass.
-///
-/// Walks the AST looking for class and function definitions.
-#[allow(non_camel_case_types)]
-pub(crate) struct Pass_Def;
-
-impl Pass_Def {
-    pub(crate) fn new() -> Self {
-        Self
-    }
-
-    pub(crate) fn compile_module(&mut self) {}
 }
 
 macro_rules! encode {
@@ -412,25 +362,24 @@ macro_rules! encode {
 }
 
 pub trait BytecodeChunkExt {
-    fn emit_simple(&mut self, opcode: Instruction);
-    fn emit_a(&mut self, opcode: Instruction, a: i32);
+    fn emit_simple(&mut self, op: OpCode);
+    fn emit_a(&mut self, op: OpCode, a: i32);
+    fn emit_data(&mut self, data: u32);
 }
 
 impl BytecodeChunkExt for Chunk {
-    fn emit_simple(&mut self, opcode: Instruction) {
-        self.code.push(opcode as u8);
-        self.code.push(0);
-        self.code.push(0);
-        self.code.push(0);
+    fn emit_simple(&mut self, op: OpCode) {
+        self.code.push(op as u32);
     }
 
-    fn emit_a(&mut self, opcode: Instruction, a: i32) {
-        let parts = a.to_le_bytes();
-        debug_assert!(parts[3] == 0, "instruction format only supports 12-bit argument");
+    fn emit_a(&mut self, op: OpCode, a: i32) {
+        debug_assert!(a <= 0xFFFFFF, "instruction format only supports 12-bit argument");
+        let prefix = op as u32;
+        let data = (a as u32 & 0xFFFFFF) << 8;
+        self.code.push(prefix | data);
+    }
 
-        self.code.push(opcode as u8);
-        self.code.push(parts[0]);
-        self.code.push(parts[1]);
-        self.code.push(parts[2]);
+    fn emit_data(&mut self, data: u32) {
+        self.code.push(data);
     }
 }

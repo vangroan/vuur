@@ -7,4 +7,5 @@ edition = "2021"
 
 [dependencies]
 byteorder = "1.4"
+log = "0.4"
 vuur_parse = { path = "../vuur_parse" }
