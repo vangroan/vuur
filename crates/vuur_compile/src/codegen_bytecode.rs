@@ -2,7 +2,8 @@ use vuur_parse::expr::{Expr, OperatorKind};
 use vuur_parse::module::VuurModule;
 use vuur_parse::stmt::{DefStmt, SimpleStmt};
 
-use crate::bytecode::opcodes::{self, OpCode};
+use crate::bytecode::encode_u64;
+use crate::bytecode::{opcodes, OpCode};
 use crate::chunk::{Chunk, ChunkHeader};
 use crate::codegen::Codegen;
 use crate::constants::*;
@@ -119,34 +120,21 @@ impl ConstValue {
         }
     }
 
-    fn to_bits(&self) -> u32 {
+    fn to_bits(&self) -> Option<u32> {
         match *self {
-            Self::I32(val) => val as u32,
-            Self::F32(val) => val.to_bits(),
-            _ => 0,
+            Self::I32(val) => Some(val as u32),
+            Self::F32(val) => Some(val.to_bits()),
+            _ => None,
         }
     }
 
-    fn to_bits2(&self) -> [u32; 2] {
+    fn to_bits2(&self) -> Option<[u32; 2]> {
         match *self {
-            _ => todo!(),
+            Self::I64(val) => Some(encode_u64(val as u64)),
+            Self::F64(val) => Some(encode_u64(val.to_bits())),
+            _ => None,
         }
     }
-}
-
-#[deprecated]
-#[doc(hidden)]
-pub fn write_header(chunk: &mut Chunk) {
-    // chunk.code.push(CHUNK_START_BYTE);
-    // chunk.code.extend_from_slice(CHUNK_HEADER);
-    // chunk.code.push(CHUNK_VERSION);
-    // chunk.code.push(CHUNK_ENDIAN_LIT);
-    // chunk.code.push(CHUNK_SIZE_32);
-
-    // // File format reserves bytes for future use.
-    // for _ in chunk.code.len()..CHUNK_HEADER_RESERVED {
-    //     chunk.code.push(0);
-    // }
 }
 
 /// Code generator that outputs interpreter bytecode.
@@ -190,11 +178,6 @@ impl BytecodeCodegen {
         *self = BytecodeCodegen::new();
     }
 
-    /// Byte offset of next instruction.
-    fn next_offset(&self) -> usize {
-        self.chunk.code.len()
-    }
-
     fn top_frame_mut(&mut self) -> &mut FuncState {
         // Create default function to make this infallible.
         if self.funcs.is_empty() {
@@ -206,14 +189,6 @@ impl BytecodeCodegen {
     }
 
     fn write_header(&mut self) {
-        // self.chunk.code.push(CHUNK_START_BYTE);
-        // self.chunk.code.extend_from_slice(CHUNK_HEADER);
-        // self.chunk.code.push(CHUNK_VERSION);
-
-        // // File format reserves bytes for future use.
-        // for _ in self.chunk.code.len()..CHUNK_HEADER_RESERVED {
-        //     self.chunk.code.push(0);
-        // }
         let header = ChunkHeader {
             version: CHUNK_VERSION,
             endianess: CHUNK_ENDIAN_LIT,
@@ -232,7 +207,7 @@ impl BytecodeCodegen {
                 // Write constants
                 self.chunk.emit_data(func.constants.len() as u32);
                 for konst in &func.constants.values {
-                    self.chunk.emit_data(konst.to_bits());
+                    self.chunk.emit_data(konst.to_bits().unwrap_or_default());
                 }
 
                 // Write bytecode instructions
@@ -353,12 +328,6 @@ impl Codegen for BytecodeCodegen {
 
         Ok(self.take())
     }
-}
-
-macro_rules! encode {
-    ($op:expr, $a:expr, $b:expr, $c:expr) => {
-        op << 24 & a << 16 & b << 8 & c
-    };
 }
 
 pub trait BytecodeChunkExt {

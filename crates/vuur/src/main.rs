@@ -52,27 +52,16 @@ fn run_repl() -> std::io::Result<()> {
                         println!("Evaluate");
                         println!("");
                         let mut vm = VM::new();
-                        vm.run(&chunk);
+                        match vm.run(&chunk) {
+                            // TODO: Support other types
+                            Some(value) => println!("{}", value as i32),
+                            None => println!("null"),
+                        }
                     }
                     Err(err) => eprintln!("{}", err),
                 }
             }
             Err(err) => eprintln!("{}", err),
         }
-    }
-}
-
-fn demo_dissasm() {
-    println!("----------------");
-    println!("Disassemble Demo");
-    println!("");
-
-    let mut buf = String::new();
-    let mut chunk = vuur_compile::Chunk::new("demo.vuur", vec![]);
-    vuur_compile::write_header(&mut chunk);
-
-    match vuur_compile::disassemble(&mut buf, &chunk) {
-        Ok(_) => println!("{}", buf),
-        Err(err) => eprintln!("disassm demo failed: {}", err),
     }
 }

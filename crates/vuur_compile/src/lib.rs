@@ -7,11 +7,9 @@ pub mod constants;
 mod disasm;
 mod error;
 mod limits;
-mod util;
 
 pub use self::chunk::Chunk;
 use self::codegen::Codegen;
-pub use self::codegen_bytecode::write_header;
 pub use self::disasm::disassemble;
 pub use self::error::*;
 

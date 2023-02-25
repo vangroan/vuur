@@ -1,66 +1,22 @@
-pub type FnSymbol = u16;
-pub type Address = u16;
-pub type RelativeAddr = i16;
-// TODO: Should Register be renamed to RegisterAddr?
-pub type Register = u8;
-pub type ConstOffset = u8;
-pub type LiteralInt = i16;
-pub const RegisterCount: usize = std::u8::MAX as usize;
+//! Interpreter bytecode
+//!
+//! ```text
+//! | type |    24 |    16 |     8 |      0 |
+//! |------|-------|-------|-------|--------|
+//! | oK   |           K           | opcode |
+//! ```
+use std::io;
 
-/// Bytecode operation.
-// #[derive(Debug, Copy, Clone)]
-// #[rustfmt::skip]
-// #[allow(non_camel_case_types)]
-// #[deprecated]
-// pub enum ByteOp {
-//     /// Only advances program counter.
-//     Noop,
-
-//     /// Unconditional jump
-//     Jmp         { addr: RelativeAddr },
-
-//     // ------------------------------------------------------------------------
-//     // Arithmetic
-//     Add_I32     { dest: Register, a: Register, b: Register },
-//     Sub_I32     { dest: Register, a: Register, b: Register },
-//     Mul_I32     { dest: Register, a: Register, b: Register },
-//     Eq_I32      { dest: Register, a: Register, b: Register },
-//     LoadConst   { dest: Register, konst: ConstOffset },
-    
-//     // ------------------------------------------------------------------------
-//     // Functions
-//     Call        { func: FnSymbol },
-//     Return,
-// }
-
-// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// #[repr(u8)]
-// #[rustfmt::skip]
-// #[allow(non_camel_case_types)]
-// #[deprecated]
-// pub enum Instruction {
-//     Noop = 0,
-
-//     // ------------------------------------------------------------------------
-//     // Arithmetic
-//     Add_I32 = 0x0A,
-//     Sub_I32,
-//     Mul_I32,
-//     Eq_I32,
-//     PushConst = 0x0E,
-//     PushConst_Imm = 0x0F,
-
-//     // ------------------------------------------------------------------------
-//     // Callables
-//     Return = 0x20,
-// }
+pub type OpCode = u8;
 
 #[rustfmt::skip]
 pub mod opcodes {
-    pub type OpCode = u8;
+    use super::OpCode;
 
     pub const NOOP: OpCode = 0;
 
+    // ------------------------------------------------------------------------
+    // Arithmetic
     pub const ADD_I32: OpCode = 0x0A;
     pub const SUB_I32: OpCode = 0x0B;
     pub const MUL_I32: OpCode = 0x0C;
@@ -69,26 +25,31 @@ pub mod opcodes {
     pub const PUSH_CONST:     OpCode = 0x0E;
     pub const PUSH_CONST_IMM: OpCode = 0x0F;
 
+    // ------------------------------------------------------------------------
+    // Callables
     pub const FUNC: OpCode = 0x10;
 
+    // ------------------------------------------------------------------------
+    // Control Flow
     pub const RETURN: OpCode = 0x20;
     pub const ABORT:  OpCode = 0xFF;
 }
 
+// TODO: Fix bytecode write and use without compiler
 pub(crate) trait WriteBytecode {
-    fn write_simple(&mut self, op: opcodes::OpCode) -> std::io::Result<()>;
-    fn write_k(&mut self, op: opcodes::OpCode, k: i32) -> std::io::Result<()>;
+    fn write_simple(&mut self, op: OpCode) -> io::Result<()>;
+    fn write_k(&mut self, op: OpCode, k: i32) -> io::Result<()>;
 }
 
 impl WriteBytecode for Vec<u32> {
     #[inline]
-    fn write_simple(&mut self, op: opcodes::OpCode) -> std::io::Result<()> {
+    fn write_simple(&mut self, op: OpCode) -> io::Result<()> {
         self.push(u32::from_le_bytes([op, 0, 0, 0]));
         Ok(())
     }
 
     #[inline]
-    fn write_k(&mut self, op: opcodes::OpCode, k: i32) -> std::io::Result<()> {
+    fn write_k(&mut self, op: OpCode, k: i32) -> io::Result<()> {
         self.push(u32::from_le_bytes([
             op,
             (k & 0xF) as u8,
@@ -100,50 +61,66 @@ impl WriteBytecode for Vec<u32> {
 }
 
 #[inline]
-pub fn get_opcode(instruction: u32) -> u8 {
+pub fn decode_opcode(instruction: u32) -> u8 {
     (instruction & 0xFF) as u8
 }
 
+/// Decode instruction of type `oK`
+///
+/// ```
+/// # use vuur_compile::bytecode::decode_k;
+/// # use vuur_compile::bytecode::opcodes::PUSH_CONST;
+/// let (opcode, konst_idx) = decode_k(0x001102_0E);
+/// assert_eq!((PUSH_CONST, 4354), (opcode, konst_idx));
+/// ```
 #[inline]
-pub fn read_arg_k(instruction: u32) -> u32 {
+pub fn decode_k(instruction: u32) -> (u8, u32) {
+    (decode_opcode(instruction), decode_arg_k(instruction))
+}
+
+#[inline]
+pub fn decode_arg_k(instruction: u32) -> u32 {
     (instruction & 0xFFFFFF00) >> 8
 }
 
 #[inline]
-pub fn read_arg_a(instruction: u32) -> i32 {
+pub fn decode_arg_a(instruction: u32) -> i32 {
     ((instruction & 0xFFFFFF00) >> 8) as i32
+}
+
+/// Encode the given 64-bit integer as two 32-bit integers.
+///
+/// The resulting encoding is intended to be encoded further
+/// as little-endian. The lowest bytes will be in position 0,
+/// and the highest bytes in position 1.
+///
+/// ```
+/// # use vuur_compile::bytecode::encode_u64;
+/// let [low, high] = encode_u64(0x200000001);
+/// assert_eq!(low, 1);
+/// assert_eq!(high, 2);
+/// ```
+#[inline]
+pub fn encode_u64(value: u64) -> [u32; 2] {
+    [(value & 0xFFFFFFFF) as u32, ((value & 0xFFFFFFFF00000000) >> 32) as u32]
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
 
-    // Bytecode instruction must be 32-bits.
-    // #[test]
-    // fn test_instruction_size() {
-    //     assert_eq!(std::mem::size_of::<ByteOp>(), 4);
-    // }
-    // #[test]
-    // fn test_u8_conversion() {
-    //     assert_eq!(
-    //         Instruction::Noop,
-    //         Instruction::try_from(Instruction::Noop as u8).unwrap()
-    //     );
+    #[test]
+    fn test_encode_64() {
+        let cases: &[(u64, [u32; 2])] = &[
+            (1, [0b1, 0b0]),
+            (
+                1147797409030816545,
+                [0b10000111011001010100001100100001, 0b00001111111011011100101110101001],
+            ),
+        ];
 
-    //     let opcodes = [
-    //         Instruction::Noop,
-    //         // -------------------------
-    //         Instruction::Add_I32,
-    //         Instruction::Sub_I32,
-    //         Instruction::Eq_I32,
-    //         Instruction::PushConst,
-    //         Instruction::PushConst_Imm,
-    //         // -------------------------
-    //         Instruction::Return,
-    //     ];
-
-    //     for opcode in opcodes {
-    //         assert_eq!(opcode, Instruction::try_from(opcode as u8).unwrap());
-    //     }
-    // }
+        for (input, output) in cases {
+            assert_eq!(*output, encode_u64(*input));
+        }
+    }
 }

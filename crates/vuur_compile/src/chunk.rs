@@ -5,7 +5,8 @@ use byteorder::{ReadBytesExt, WriteBytesExt};
 
 use crate::constants::*;
 use crate::error::{CompileError, ErrorKind, Result};
-use crate::util::ReadExt;
+
+// TODO: Serialise and deserialise chunk to binary file
 
 /// Binary chunk of executable byte code, intended for the interpreter VM.
 pub struct Chunk {
@@ -87,22 +88,21 @@ impl ChunkHeader {
 
         // Header Marker
         let mut buf = [0_u8; CHUNK_HEADER.len()];
-        cursor
-            .read_exact(&mut buf)
-            .map_err(|err| CompileError::new(ErrorKind::Decode, "failed to read chunk header into buffer"))?;
+        cursor.read_exact(&mut buf).map_err(|err| {
+            CompileError::new(
+                ErrorKind::Decode,
+                format!("failed to read chunk header into buffer: {}", err),
+            )
+        })?;
         if buf != CHUNK_HEADER {
             return Err(CompileError::new(ErrorKind::Decode, "invalid chunk header"));
         }
 
         // Language Version
         let version = cursor.read_u8()?;
-        // if version != CHUNK_VERSION {
-        //     panic!("unexpected chunk version: {}", version);
-        // }
 
         let endianess = cursor.read_u8()?;
-        // TODO: integer size marker
-        let size_t: u8 = cursor.read_u8()?;
+        let size_t: u8 = cursor.read_u8()?; // TODO: integer size marker
 
         debug_assert!(
             (cursor.position() as usize) <= CHUNK_HEADER_RESERVED,
@@ -118,26 +118,19 @@ impl ChunkHeader {
         Ok(chunk_header)
     }
 
-    pub fn encode(&self, buf: &mut [u32]) -> std::io::Result<()> {
-        let bytes = vec![];
+    pub fn encode(&self, buf: &mut [u8]) -> std::io::Result<()> {
+        let mut cursor = Cursor::new(buf);
 
-        {
-            let mut cursor = Cursor::new(bytes);
+        cursor.write_u8(CHUNK_START_BYTE)?;
+        cursor.write_all(CHUNK_HEADER)?;
+        cursor.write_u8(self.version)?;
+        cursor.write_u8(self.endianess)?;
+        cursor.write_u8(self.size_t)?;
 
-            cursor.write_u8(CHUNK_START_BYTE)?;
-            cursor.write_all(CHUNK_HEADER)?;
-            cursor.write_u8(self.version)?;
-            cursor.write_u8(self.endianess)?;
-            cursor.write_u8(self.size_t)?;
-
-            // File format reserves bytes for future use.
-            while cursor.position() < CHUNK_HEADER_RESERVED as u64 {
-                cursor.write_u8(0)?;
-            }
+        // File format reserves bytes for future use.
+        while cursor.position() < CHUNK_HEADER_RESERVED as u64 {
+            cursor.write_u8(0)?;
         }
-
-        // FIXME
-        // bytes.read_slice_u32(&mut buf)?;
 
         Ok(())
     }
@@ -155,4 +148,49 @@ impl std::fmt::Display for ChunkHeader {
     }
 }
 
-pub(crate) type ByteCursor<'a> = Cursor<&'a [u8]>;
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    const TEST_VERSION: u8 = 42;
+
+    #[test]
+    #[rustfmt::skip]
+    fn test_header_decode() {
+        let bytes: &[u8; CHUNK_HEADER_RESERVED] = &[
+            CHUNK_START_BYTE,
+            0x76, 0x75, 0x75, 0x72, 0x0, // "vuur\0"
+            0x2A,  // version
+            0x1,   // little endian
+            0x4,   // 32-bit usize
+            0, 0, 0, 0, 0, 0, 0,
+        ];
+
+        let header = ChunkHeader::decode(bytes).expect("failed to decode chunk header");
+
+        assert_eq!(header.version, TEST_VERSION);
+        assert_eq!(header.endianess, CHUNK_ENDIAN_LIT);
+        assert_eq!(header.size_t, CHUNK_SIZE_32);
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn test_header_encode() {
+        let header = ChunkHeader {
+            version: TEST_VERSION, endianess: CHUNK_ENDIAN_LIT, size_t: CHUNK_SIZE_32
+        };
+
+        let mut buf = [0u8; CHUNK_HEADER_RESERVED];
+        header.encode(&mut buf).expect("failed to encode chunk header");
+
+        let expected = &[
+            CHUNK_START_BYTE,
+            0x76, 0x75, 0x75, 0x72, 0x0, // "vuur\0"
+            0x2A,  // version
+            0x1,   // little endian
+            0x4,   // 32-bit usize
+            0, 0, 0, 0, 0, 0, 0,
+        ];
+        assert_eq!(&buf, expected);
+    }
+}

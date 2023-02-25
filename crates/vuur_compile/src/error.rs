@@ -34,7 +34,7 @@ impl fmt::Display for CompileError {
     #[cold]
     #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "compile error: ");
+        write!(f, "compile error: ")?;
         match self.kind {
             ErrorKind::Compiler => write!(f, "failed to compile: {}", self.message),
             ErrorKind::Decode => write!(f, "failed to decode bytes: {}", self.message),

@@ -20,6 +20,6 @@ fn test_basic_arithmetic() {
         file.flush().expect("flush chunk binary file");
         drop(file);
 
-        todo!()
+        todo!("marshal chunk to file")
     }
 }

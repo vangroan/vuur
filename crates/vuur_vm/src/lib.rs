@@ -1,9 +1,13 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use vuur_compile::bytecode::{get_opcode, opcodes as ops, read_arg_a, read_arg_k};
+use vuur_compile::bytecode::{decode_arg_a, decode_arg_k, decode_opcode, opcodes as ops};
 use vuur_compile::constants::CHUNK_HEADER_RESERVED;
 use vuur_compile::Chunk;
+
+pub mod error;
+
+use self::error::{ErrorKind, Result, RuntimeError};
 
 pub const STRIDE: usize = 4;
 pub const END_OF_CHUNK: usize = std::usize::MAX;
@@ -47,19 +51,32 @@ impl VM {
         }
     }
 
-    pub fn run(&mut self, chunk: &Chunk) {
+    // TODO: Return value from finished fiber
+    pub fn run(&mut self, chunk: &Chunk) -> Option<u32> {
         match (*self.fiber).try_borrow_mut() {
             Ok(mut fiber) => {
                 fiber.ip = 0;
                 fiber.run(chunk);
                 if fiber.done {
                     // Fiber is done executing, and cannot be resumed.
-                    // TODO: Return top stack value
-                    println!("fiber is done: {:?}", fiber.stack);
+                    match fiber.take_return() {
+                        Ok(return_value) => Some(return_value),
+                        Err(RuntimeError {
+                            kind: ErrorKind::Nil, ..
+                        }) => None,
+                        Err(err) => {
+                            eprintln!("failed getting return value from fiber: {}", err);
+                            None
+                        }
+                    }
+                } else {
+                    // TODO: Communicate to caller that fiber is paused
+                    None
                 }
             }
             Err(err) => {
                 eprintln!("fiber already borrowed: {}", err);
+                None
             }
         }
     }
@@ -82,6 +99,18 @@ impl Fiber {
         }
     }
 
+    // TODO: Support other value types for Fiber return
+    pub fn take_return(&mut self) -> Result<u32> {
+        if self.done {
+            self.stack.last().cloned().ok_or_else(|| RuntimeError::new(ErrorKind::Nil, ""))
+        } else {
+            Err(RuntimeError::new(
+                ErrorKind::FiberState,
+                "cannot return value from running fiber",
+            ))
+        }
+    }
+
     pub fn run(&mut self, chunk: &Chunk) {
         'eval: loop {
             if self.ip >= chunk.code().len() {
@@ -97,8 +126,7 @@ impl Fiber {
                 print!("{:02X} {:02X} {:02X} {:02X}  ", o, a, b, c);
             }
 
-            let op = get_opcode(instruction);
-            // print!("opcode: {}", op);
+            let op = decode_opcode(instruction);
 
             match op {
                 ops::NOOP => {
@@ -131,12 +159,12 @@ impl Fiber {
                 }
                 ops::PUSH_CONST => {
                     // TODO: constant table
-                    let konst_idx = read_arg_k(instruction);
+                    let konst_idx = decode_arg_k(instruction);
                     println!(".pushk {}", konst_idx);
                     self.ip += 1
                 }
                 ops::PUSH_CONST_IMM => {
-                    let konst = read_arg_a(instruction);
+                    let konst = decode_arg_a(instruction);
                     println!(".pushi {}", konst);
                     self.stack.push(konst as u32);
                     self.ip += 1;
