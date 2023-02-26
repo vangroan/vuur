@@ -64,9 +64,8 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::bytecode::opcodes::*;
+    use crate::bytecode::{opcodes::*, WriteBytecode};
     use crate::chunk::ChunkHeader;
-    use crate::codegen_bytecode::BytecodeChunkExt;
 
     #[test]
     fn test_basic_disassemble() {
@@ -77,10 +76,11 @@ mod test {
             endianess: CHUNK_ENDIAN_LIT,
             size_t: CHUNK_SIZE_32,
         };
-        chunk.emit_a(PUSH_CONST, 0);
-        chunk.emit_a(PUSH_CONST, 1);
-        chunk.emit_simple(ADD_I32);
-        chunk.emit_simple(RETURN);
+        let code = chunk.code_mut();
+        code.write_a(PUSH_CONST, 0).unwrap();
+        code.write_a(PUSH_CONST, 1).unwrap();
+        code.write_simple(ADD_I32).unwrap();
+        code.write_simple(RETURN).unwrap();
 
         disassemble(&mut buf, &chunk).expect("failed to disassemble binary chunk");
 

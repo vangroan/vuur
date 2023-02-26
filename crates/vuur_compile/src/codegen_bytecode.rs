@@ -2,8 +2,7 @@ use vuur_parse::expr::{Expr, OperatorKind};
 use vuur_parse::module::VuurModule;
 use vuur_parse::stmt::{DefStmt, SimpleStmt};
 
-use crate::bytecode::encode_u64;
-use crate::bytecode::{opcodes, OpCode};
+use crate::bytecode::{encode_u64, opcodes, OpCode, WriteBytecode};
 use crate::chunk::{Chunk, ChunkHeader};
 use crate::codegen::Codegen;
 use crate::constants::*;
@@ -31,27 +30,6 @@ struct FuncState {
 impl FuncState {
     fn add_constant(&mut self, konst: ConstValue) -> usize {
         self.constants.add_constant(konst)
-    }
-
-    fn emit_simple(&mut self, op: OpCode) {
-        self.bytecode.push(op as u32);
-    }
-
-    fn emit_k(&mut self, op: OpCode, k: u32) {
-        debug_assert!(k <= 0xFFFFFF, "instruction format only supports 24-bit argument");
-        let prefix = op as u32;
-        let data = (k as u32 & 0xFFFFFF) << 8;
-        self.bytecode.push(prefix | data);
-    }
-
-    fn emit_a(&mut self, op: OpCode, a: i32) {
-        debug_assert!(
-            a <= INSTRUCTION_A_MAX,
-            "instruction format only supports 24-bit argument"
-        );
-        let prefix = op as u32;
-        let data = (a as u32 & 0xFFFFFF) << 8;
-        self.bytecode.push(prefix | data);
     }
 }
 
@@ -202,12 +180,12 @@ impl BytecodeCodegen {
         match self.funcs.pop() {
             Some(func) => {
                 // Emit function def header
-                self.chunk.emit_simple(opcodes::FUNC);
+                self.chunk.code_mut().write_simple(opcodes::FUNC)?;
 
                 // Write constants
-                self.chunk.emit_data(func.constants.len() as u32);
+                self.chunk.code_mut().write_data(func.constants.len() as u32)?;
                 for konst in &func.constants.values {
-                    self.chunk.emit_data(konst.to_bits().unwrap_or_default());
+                    self.chunk.code_mut().write_data(konst.to_bits().unwrap_or_default())?;
                 }
 
                 // Write bytecode instructions
@@ -229,9 +207,9 @@ impl BytecodeCodegen {
         self.funcs.push(FuncState { ..FuncState::default() });
 
         self.compile_stmts(&module.stmts)?;
-        self.compile_return();
+        self.compile_return()?;
 
-        self.finish_func();
+        self.finish_func()?;
 
         Ok(())
     }
@@ -262,7 +240,7 @@ impl BytecodeCodegen {
 
                 // If the literal is small enough, inline it into an immediate instruction.
                 if lit >= 0 && lit <= INSTRUCTION_A_MAX {
-                    scope.emit_a(opcodes::PUSH_CONST_IMM, lit);
+                    scope.bytecode.write_a(opcodes::PUSH_CONST_IMM, lit)?;
                 } else {
                     // Integer is too large to be inlined into the bytecode.
                     // Add it to the constant table.
@@ -277,7 +255,7 @@ impl BytecodeCodegen {
                     }
 
                     // Emit
-                    scope.emit_k(opcodes::PUSH_CONST, index as u32);
+                    scope.bytecode.write_k(opcodes::PUSH_CONST, index as u32)?;
                 }
             }
             Expr::Binary(binary) => {
@@ -288,14 +266,14 @@ impl BytecodeCodegen {
 
                 match binary.operator.kind {
                     OperatorKind::Add => {
-                        scope.emit_simple(opcodes::ADD_I32);
+                        scope.bytecode.write_simple(opcodes::ADD_I32)?;
                         // self.chunk.emit_simple(Instruction::Add_I32);
                     }
                     OperatorKind::Sub => {
-                        scope.emit_simple(opcodes::SUB_I32);
+                        scope.bytecode.write_simple(opcodes::SUB_I32)?;
                     }
                     OperatorKind::Mul => {
-                        scope.emit_simple(opcodes::MUL_I32);
+                        scope.bytecode.write_simple(opcodes::MUL_I32)?;
                         // self.chunk.emit_simple(Instruction::Mul_I32);
                     }
                     _ => todo!("operator kind {:?} not implemented yet", binary.operator.kind),
@@ -306,7 +284,7 @@ impl BytecodeCodegen {
             }
             Expr::NameAccess(_) => {
                 eprint!("name access not implemented");
-                self.top_frame_mut().emit_simple(opcodes::NOOP);
+                self.top_frame_mut().bytecode.write_simple(opcodes::NOOP)?;
             }
             _ => todo!(),
         }
@@ -314,8 +292,9 @@ impl BytecodeCodegen {
         Ok(())
     }
 
-    fn compile_return(&mut self) {
-        self.top_frame_mut().emit_simple(opcodes::RETURN)
+    fn compile_return(&mut self) -> Result<()> {
+        self.top_frame_mut().bytecode.write_simple(opcodes::RETURN)?;
+        Ok(())
     }
 }
 
@@ -327,28 +306,5 @@ impl Codegen for BytecodeCodegen {
         self.compile_module(module)?;
 
         Ok(self.take())
-    }
-}
-
-pub trait BytecodeChunkExt {
-    fn emit_simple(&mut self, op: OpCode);
-    fn emit_a(&mut self, op: OpCode, a: i32);
-    fn emit_data(&mut self, data: u32);
-}
-
-impl BytecodeChunkExt for Chunk {
-    fn emit_simple(&mut self, op: OpCode) {
-        self.code.push(op as u32);
-    }
-
-    fn emit_a(&mut self, op: OpCode, a: i32) {
-        debug_assert!(a <= 0xFFFFFF, "instruction format only supports 12-bit argument");
-        let prefix = op as u32;
-        let data = (a as u32 & 0xFFFFFF) << 8;
-        self.code.push(prefix | data);
-    }
-
-    fn emit_data(&mut self, data: u32) {
-        self.code.push(data);
     }
 }

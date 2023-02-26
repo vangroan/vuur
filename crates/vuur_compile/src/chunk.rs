@@ -15,6 +15,8 @@ pub struct Chunk {
     /// Name of file where the original source was loaded.
     pub(crate) name: String,
     pub(crate) header: ChunkHeader,
+    // _padding: [u8; 8],
+    // ---- 64 byte cache line -----
 }
 
 impl Chunk {
@@ -40,6 +42,11 @@ impl Chunk {
     #[inline]
     pub fn code(&self) -> &[u32] {
         &self.code
+    }
+
+    #[inline]
+    pub(crate) fn code_mut(&mut self) -> &mut Vec<u32> {
+        &mut self.code
     }
 
     #[inline]

@@ -37,11 +37,19 @@ pub mod opcodes {
 
 // TODO: Fix bytecode write and use without compiler
 pub(crate) trait WriteBytecode {
+    fn write_data(&mut self, data: u32) -> io::Result<()>;
     fn write_simple(&mut self, op: OpCode) -> io::Result<()>;
-    fn write_k(&mut self, op: OpCode, k: i32) -> io::Result<()>;
+    fn write_k(&mut self, op: OpCode, k: u32) -> io::Result<()>;
+    fn write_a(&mut self, op: OpCode, a: i32) -> io::Result<()>;
 }
 
 impl WriteBytecode for Vec<u32> {
+    #[inline]
+    fn write_data(&mut self, data: u32) -> io::Result<()> {
+        self.push(data);
+        Ok(())
+    }
+
     #[inline]
     fn write_simple(&mut self, op: OpCode) -> io::Result<()> {
         self.push(u32::from_le_bytes([op, 0, 0, 0]));
@@ -49,13 +57,14 @@ impl WriteBytecode for Vec<u32> {
     }
 
     #[inline]
-    fn write_k(&mut self, op: OpCode, k: i32) -> io::Result<()> {
-        self.push(u32::from_le_bytes([
-            op,
-            (k & 0xF) as u8,
-            ((k >> 1) & 0xF0) as u8,
-            ((k >> 2) & 0xF00) as u8,
-        ]));
+    fn write_k(&mut self, op: OpCode, k: u32) -> io::Result<()> {
+        self.push(encode_k(op, k));
+        Ok(())
+    }
+
+    #[inline]
+    fn write_a(&mut self, op: OpCode, a: i32) -> io::Result<()> {
+        self.push(encode_a(op, a));
         Ok(())
     }
 }
@@ -88,6 +97,17 @@ pub fn decode_arg_a(instruction: u32) -> i32 {
     ((instruction & 0xFFFFFF00) >> 8) as i32
 }
 
+pub fn encode_k(op: OpCode, k: u32) -> u32 {
+    debug_assert!(k <= 0xFFFFFF, "argument k must fit in 24 bits");
+    (op as u32) | ((k & 0xFFFFFF) << 8)
+}
+
+pub fn encode_a(op: OpCode, a: i32) -> u32 {
+    debug_assert!(a <= 0x7FFFFF, "argument a must fit in 24 bits");
+    debug_assert!(a >= -0x7FFFFF, "argument a must fit in 24 bits");
+    (op as u32) | (((a & 0xFFFFFF) as u32) << 8)
+}
+
 /// Encode the given 64-bit integer as two 32-bit integers.
 ///
 /// The resulting encoding is intended to be encoded further
@@ -108,6 +128,24 @@ pub fn encode_u64(value: u64) -> [u32; 2] {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    #[rustfmt::skip]
+    fn test_encode_k() {
+        let cases: &[((OpCode, u32), [u8; 4])] = &[
+            (
+                (opcodes::PUSH_CONST, 0x30201),
+                [0x0E, 0x01, 0x02, 0x03],
+            ),
+        ];
+
+        for (input, output) in cases {
+            assert_eq!(*output, encode_k(input.0, input.1).to_le_bytes());
+        }
+    }
+
+    #[test]
+    fn test_encode_a() {}
 
     #[test]
     fn test_encode_64() {
