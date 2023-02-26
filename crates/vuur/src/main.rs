@@ -1,6 +1,6 @@
 //! Read-eval-print loop.
 use std::io::Write;
-use vuur_compile::disassemble;
+use vuur_compile::{disassemble, Chunk};
 use vuur_lexer::Lexer;
 use vuur_vm::VM;
 
@@ -37,6 +37,9 @@ fn run_repl() -> std::io::Result<()> {
 
                 match vuur_compile::compile(&module) {
                     Ok(chunk) => {
+                        println!("Saving chunk");
+                        save_chunk(&chunk);
+
                         let mut buf = String::new();
                         match disassemble(&mut buf, &chunk) {
                             Ok(_) => {
@@ -64,4 +67,12 @@ fn run_repl() -> std::io::Result<()> {
             Err(err) => eprintln!("{}", err),
         }
     }
+}
+
+fn save_chunk(chunk: &Chunk) {
+    let mut buf = Vec::new();
+    chunk.encode(&mut buf).unwrap();
+
+    let mut file = std::fs::File::create("test_codegen.bin").unwrap();
+    file.write(&buf).unwrap();
 }

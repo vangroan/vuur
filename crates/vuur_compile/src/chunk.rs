@@ -1,7 +1,7 @@
 //! Executable bytecode chunk.
-use std::io::{Cursor, Read, Write};
+use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 
-use byteorder::{ReadBytesExt, WriteBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use crate::constants::*;
 use crate::error::{CompileError, ErrorKind, Result};
@@ -57,6 +57,19 @@ impl Chunk {
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.code.is_empty()
+    }
+
+    pub fn encode(&self, buffer: &mut Vec<u8>) -> Result<()> {
+        self.header.encode_vec(buffer)?;
+
+        let mut cursor = Cursor::new(buffer);
+        cursor.seek(SeekFrom::Start(CHUNK_HEADER_RESERVED as u64))?;
+
+        for instruction in self.code.iter().cloned() {
+            cursor.write_u32::<LittleEndian>(instruction)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -125,8 +138,34 @@ impl ChunkHeader {
         Ok(chunk_header)
     }
 
-    pub fn encode(&self, buf: &mut [u8]) -> std::io::Result<()> {
+    pub fn encode(&self, buf: &mut [u8]) -> Result<()> {
+        debug_assert!(
+            buf.len() >= CHUNK_HEADER_RESERVED,
+            "buffer is too small for chunk header"
+        );
+
         let mut cursor = Cursor::new(buf);
+
+        cursor.write_u8(CHUNK_START_BYTE)?;
+        cursor.write_all(CHUNK_HEADER)?;
+        cursor.write_u8(self.version)?;
+        cursor.write_u8(self.endianess)?;
+        cursor.write_u8(self.size_t)?;
+
+        // File format reserves bytes for future use.
+        while cursor.position() < CHUNK_HEADER_RESERVED as u64 {
+            cursor.write_u8(0)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn encode_vec(&self, vec: &mut Vec<u8>) -> Result<()> {
+        // let start = if vec.is_empty() { 0 } else { vec.len() };
+        // vec.extend((0..CHUNK_HEADER_RESERVED).map(|_| 0));
+        // println!("vec len {}", vec.len());
+        // self.encode(&mut vec[start..start + CHUNK_HEADER_RESERVED])
+        let mut cursor = Cursor::new(vec);
 
         cursor.write_u8(CHUNK_START_BYTE)?;
         cursor.write_all(CHUNK_HEADER)?;

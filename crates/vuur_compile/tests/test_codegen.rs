@@ -16,10 +16,10 @@ fn test_basic_arithmetic() {
         println!("{}", buf);
 
         let mut file = File::create("./test_chunk.bin").unwrap();
-        // file.write(chunk.code()).expect("write chunk binary file");
+        let mut buf = Vec::new();
+        chunk.encode(&mut buf).unwrap();
+        file.write(&buf).expect("write chunk binary file");
         file.flush().expect("flush chunk binary file");
         drop(file);
-
-        todo!("marshal chunk to file")
     }
 }

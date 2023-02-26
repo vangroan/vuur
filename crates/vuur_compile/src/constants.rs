@@ -1,6 +1,9 @@
 //! Compiler constants.
 
 /// First byte of a binary chunk.
+///
+/// Escape character helps distinguish a binary chunk from
+/// user written source text.
 pub const CHUNK_START_BYTE: u8 = 0x1B; // ASCII ESCAPE
 
 /// Header marker of a binary chunk following the first byte,
