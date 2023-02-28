@@ -157,6 +157,12 @@ impl Fiber {
                     self.stack.push(c as u32);
                     self.ip += 1
                 }
+                ops::NEG_I32 => {
+                    println!(".mul");
+                    let b = self.stack.pop().unwrap_or_default() as i32;
+                    self.stack.push(-b as u32);
+                    self.ip += 1;
+                }
                 ops::PUSH_CONST => {
                     // TODO: constant table
                     let konst_idx = decode_arg_k(instruction);

@@ -34,6 +34,7 @@ where
             opcodes::ADD_I32 => write!(f, ".add")?,
             opcodes::SUB_I32 => write!(f, ".sub")?,
             opcodes::MUL_I32 => write!(f, ".mul")?,
+            opcodes::NEG_I32 => write!(f, ".neg")?,
             opcodes::PUSH_CONST => write!(f, ".pushk\t{}", decode_arg_k(instruction))?,
             opcodes::PUSH_CONST_IMM => write!(f, ".pushi\t{}", decode_arg_a(instruction))?,
             opcodes::FUNC => write!(f, ".function")?,

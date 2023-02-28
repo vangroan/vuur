@@ -20,18 +20,20 @@ pub mod opcodes {
     pub const ADD_I32: OpCode = 0x0A;
     pub const SUB_I32: OpCode = 0x0B;
     pub const MUL_I32: OpCode = 0x0C;
-    pub const EQ_I32:  OpCode = 0x0D;
+    pub const DIV_I32: OpCode = 0x0D;
+    pub const NEG_I32: OpCode = 0x0E;
+    pub const EQ_I32:  OpCode = 0x0F;
 
-    pub const PUSH_CONST:     OpCode = 0x0E;
-    pub const PUSH_CONST_IMM: OpCode = 0x0F;
+    pub const PUSH_CONST:     OpCode = 0x10;
+    pub const PUSH_CONST_IMM: OpCode = 0x11;
 
     // ------------------------------------------------------------------------
     // Callables
-    pub const FUNC: OpCode = 0x10;
+    pub const FUNC: OpCode = 0x20;
 
     // ------------------------------------------------------------------------
     // Control Flow
-    pub const RETURN: OpCode = 0x20;
+    pub const RETURN: OpCode = 0x30;
     pub const ABORT:  OpCode = 0xFF;
 }
 
@@ -79,7 +81,7 @@ pub fn decode_opcode(instruction: u32) -> u8 {
 /// ```
 /// # use vuur_compile::bytecode::decode_k;
 /// # use vuur_compile::bytecode::opcodes::PUSH_CONST;
-/// let (opcode, konst_idx) = decode_k(0x001102_0E);
+/// let (opcode, konst_idx) = decode_k(0x001102_10);
 /// assert_eq!((PUSH_CONST, 4354), (opcode, konst_idx));
 /// ```
 #[inline]
@@ -135,7 +137,7 @@ mod test {
         let cases: &[((OpCode, u32), [u8; 4])] = &[
             (
                 (opcodes::PUSH_CONST, 0x30201),
-                [0x0E, 0x01, 0x02, 0x03],
+                [0x10, 0x01, 0x02, 0x03],
             ),
         ];
 

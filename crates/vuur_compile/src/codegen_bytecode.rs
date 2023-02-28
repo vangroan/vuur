@@ -258,6 +258,18 @@ impl BytecodeCodegen {
                     scope.bytecode.write_k(opcodes::PUSH_CONST, index as u32)?;
                 }
             }
+            Expr::Unary(unary) => {
+                self.compile_expr(&unary.rhs)?;
+
+                let scope = self.top_frame_mut();
+
+                match unary.operator.kind {
+                    OperatorKind::Neg => {
+                        scope.bytecode.write_simple(opcodes::NEG_I32)?;
+                    }
+                    _ => todo!("unary operator kind {:?}", unary.operator.kind),
+                }
+            }
             Expr::Binary(binary) => {
                 self.compile_expr(&binary.lhs)?;
                 self.compile_expr(&binary.rhs)?;
@@ -276,7 +288,7 @@ impl BytecodeCodegen {
                         scope.bytecode.write_simple(opcodes::MUL_I32)?;
                         // self.chunk.emit_simple(Instruction::Mul_I32);
                     }
-                    _ => todo!("operator kind {:?} not implemented yet", binary.operator.kind),
+                    _ => todo!("binary operator kind {:?}", binary.operator.kind),
                 }
             }
             Expr::Group(group) => {

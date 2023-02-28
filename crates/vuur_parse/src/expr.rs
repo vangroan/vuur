@@ -178,7 +178,8 @@ pub struct Operator {
 /// Arithmetic operation with an expression on the right side.
 #[derive(Debug)]
 pub struct UnaryOp {
-    pub operator: Token,
+    // pub operator: Token,
+    pub operator: Operator,
     pub rhs: Box<Expr>,
 }
 
@@ -384,9 +385,16 @@ impl Expr {
             T::Keyword(K::Func) => todo!("anonymous function"),
             T::Sub => {
                 // Negate
+                let kind = match token.kind {
+                    T::Sub => OperatorKind::Neg,
+                    _ => unreachable!("all outer match cases must be covered in inner match"),
+                };
+
+                let operator = Operator { kind, token };
+
                 Expr::parse_precedence(input, Precedence::Unary)
                     .map(|right| UnaryOp {
-                        operator: token,
+                        operator,
                         rhs: Box::new(right),
                     })
                     .map(Expr::Unary)

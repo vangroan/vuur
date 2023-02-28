@@ -4,7 +4,7 @@ use vuur_compile::{compile, disassemble};
 
 #[test]
 fn test_basic_arithmetic() {
-    const SRC: &[&str] = &["1 + 2"];
+    const SRC: &[&str] = &["1 + 2", "-4 + 3 * 2"];
 
     for source in SRC {
         let module = vuur_parse::parse_str(source).unwrap();
