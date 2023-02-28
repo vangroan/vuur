@@ -1,4 +1,5 @@
 //! Function declarations.
+use std::cell::Cell;
 
 use vuur_lexer::{Keyword, TokenKind};
 
@@ -16,6 +17,7 @@ pub struct FuncDef {
     pub args: Delimited<FuncArg, Separator>,
     pub rtn: Option<FuncRtn>,
     pub body: Block,
+    pub symbol: Cell<u32>,
 }
 
 #[derive(Debug)]
@@ -68,7 +70,16 @@ impl Parse for FuncDef {
         // body
         let body = Block::parse(input)?;
 
-        Ok(FuncDef { name, args, rtn, body })
+        // symbol assigned by compiler later
+        let symbol = Cell::new(0);
+
+        Ok(FuncDef {
+            name,
+            args,
+            rtn,
+            body,
+            symbol,
+        })
     }
 }
 

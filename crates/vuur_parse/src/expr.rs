@@ -143,16 +143,36 @@ pub enum Expr {
     Call(Call),
 }
 
+/// Arithmetic operator kind.
+#[derive(Debug, PartialEq, Eq)]
+pub enum OperatorKind {
+    Neg,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Assign,
+    Equals,
+}
+
 /// Number literal.
 #[derive(Debug)]
 pub struct NumLit {
     pub token: Token,
+    pub value: i32,
 }
 
 /// Grouped expression between parentises "(expr)"
 #[derive(Debug)]
 pub struct Group {
     pub expr: Box<Expr>,
+}
+
+/// Arithmetic operator
+#[derive(Debug)]
+pub struct Operator {
+    pub kind: OperatorKind,
+    pub token: Token,
 }
 
 /// Arithmetic operation with an expression on the right side.
@@ -165,7 +185,7 @@ pub struct UnaryOp {
 /// Arithmetic operation with an expression on either side.
 #[derive(Debug)]
 pub struct BinaryOp {
-    pub operator: Token,
+    pub operator: Operator,
     pub lhs: Box<Expr>,
     pub rhs: Box<Expr>,
 }
@@ -208,7 +228,7 @@ pub enum MemberPath {
 /// ```
 ///
 /// `path` can either be a simple identifier, or a
-/// tree of futher member access nodes forming a chain.
+/// tree of further member access nodes forming a chain.
 ///
 /// ```non-rust
 /// foo.bar.baz
@@ -358,9 +378,9 @@ impl Expr {
         println!("Expr::parse_prefix(_, {:?})", token.kind);
 
         match token.kind {
-            T::Number => Expr::parse_number_literal(token).map(Expr::Num),
+            T::Number => Expr::parse_number_literal(input, token).map(Expr::Num),
             T::LeftParen => Expr::parse_group(input).map(Expr::Group),
-            T::Ident => Expr::parse_name(input, token),
+            T::Ident => Expr::parse_postfix(input, token),
             T::Keyword(K::Func) => todo!("anonymous function"),
             T::Sub => {
                 // Negate
@@ -405,13 +425,28 @@ impl Expr {
         let right = Self::parse_precedence(input, precedence + binding_power)?;
 
         match token.kind {
+            // Binary Operators
             T::Add | T::Sub | T::Mul | T::Div | T::Eq | T::EqEq => {
-                // Binary Operator
-                Ok(Expr::Binary(BinaryOp {
-                    operator: token,
+                // FIXME: Does `Eq` for assignment belong here when it's covered by postfix?
+                let kind = match token.kind {
+                    T::Add => OperatorKind::Add,
+                    T::Sub => OperatorKind::Sub,
+                    T::Mul => OperatorKind::Mul,
+                    T::Div => OperatorKind::Div,
+                    T::Eq => OperatorKind::Assign,
+                    T::EqEq => OperatorKind::Equals,
+                    _ => unreachable!("all outer match cases must be covered in inner match"),
+                };
+
+                let operator = Operator { kind, token };
+
+                let binary_op = BinaryOp {
+                    operator,
                     lhs: Box::new(left),
                     rhs: Box::new(right),
-                }))
+                };
+
+                Ok(Expr::Binary(binary_op))
             }
             _ => Err(syntax_err("infix expression expected")),
         }
@@ -419,9 +454,12 @@ impl Expr {
 }
 
 impl Expr {
-    fn parse_number_literal(token: Token) -> ParseResult<NumLit> {
+    fn parse_number_literal(input: &mut TokenStream, token: Token) -> ParseResult<NumLit> {
         // TODO: Different number formats. binary, octal, decimal, hex, scientific
-        Ok(NumLit { token })
+        let fragment = input.token_fragment(&token);
+        let value = i32::from_str_radix(fragment, 10)
+            .map_err(|err| syntax_err(format!("failed to parse number literal: {}", err)))?;
+        Ok(NumLit { token, value })
     }
 
     /// Parse expression contained in parentheses.
@@ -432,14 +470,14 @@ impl Expr {
         Ok(Group { expr })
     }
 
-    /// Parse a variable name.
+    /// Parse a postfix expression, triggered by encoutering a variable name.
     ///
     /// Depending on what follows the variable's identifier, the bare
     /// name can be part of the following:
     ///
     /// - dot delimited member access
     /// - function call
-    fn parse_name(input: &mut TokenStream, token: Token) -> ParseResult<Expr> {
+    fn parse_postfix(input: &mut TokenStream, token: Token) -> ParseResult<Expr> {
         use TokenKind as T;
 
         println!("Expr::parse_name(_, {:?})", token.kind);

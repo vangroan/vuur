@@ -1,9 +1,24 @@
 use vuur_lexer::{Lexer, TokenKind};
 use vuur_parse::{
-    expr::{BinaryOp, Expr},
+    expr::{BinaryOp, Expr, OperatorKind},
     stream::TokenStream,
     Parse,
 };
+
+/// Test number literal parsing.
+#[test]
+fn test_number_literal() {
+    let cases: &[(&str, i32)] = &[("1", 1), ("123456", 123456), ("000", 0)];
+
+    for (case_no, (source, expected)) in cases.iter().enumerate() {
+        let lexer = Lexer::from_source(source);
+        let mut stream = TokenStream::new(lexer);
+        let expr = Expr::parse(&mut stream)
+            .unwrap_or_else(|err| panic!("case {}: failed to parse number literal '{}': {}", case_no, source, err));
+        let num_lit = expr.expr_num_lit().expect("expression is not a number literal");
+        assert_eq!(num_lit.value, *expected);
+    }
+}
 
 /// Test parentheses groups.
 #[test]
@@ -15,13 +30,14 @@ fn test_parentheses_group() {
     println!("{:#?}", expr);
 
     let mul_op = expr.expr_bin_op().expect("binary op");
-    assert_eq!(mul_op.operator.fragment(source), "*");
-    assert_eq!(mul_op.operator.kind, TokenKind::Mul);
+    assert_eq!(mul_op.operator.kind, OperatorKind::Mul);
+    assert_eq!(mul_op.operator.token.fragment(source), "*");
+    assert_eq!(mul_op.operator.token.kind, TokenKind::Mul);
 
     {
         let left_op = mul_op.lhs.expr_group().expect("group").expr.expr_bin_op().expect("binary op");
-        assert_eq!(left_op.operator.fragment(source), "-");
-        assert_eq!(left_op.operator.kind, TokenKind::Sub);
+        assert_eq!(left_op.operator.token.fragment(source), "-");
+        assert_eq!(left_op.operator.token.kind, TokenKind::Sub);
         assert_eq!(
             left_op.lhs.expr_num_lit().expect("number literal").token.fragment(source),
             "1"
@@ -34,8 +50,8 @@ fn test_parentheses_group() {
 
     {
         let right_op = mul_op.rhs.expr_group().expect("group").expr.expr_bin_op().expect("binary op");
-        assert_eq!(right_op.operator.fragment(source), "+");
-        assert_eq!(right_op.operator.kind, TokenKind::Add);
+        assert_eq!(right_op.operator.token.fragment(source), "+");
+        assert_eq!(right_op.operator.token.kind, TokenKind::Add);
         assert_eq!(
             right_op.lhs.expr_num_lit().expect("number literal").token.fragment(source),
             "3"
@@ -138,7 +154,9 @@ fn test_simple_call_arithm_arg() {
             .expr_bin_op()
             .expect("binary operation");
 
-        assert_eq!(operator.fragment(source), "+");
+        assert_eq!(operator.kind, OperatorKind::Add);
+        assert_eq!(operator.token.kind, TokenKind::Add);
+        assert_eq!(operator.token.fragment(source), "+");
         assert_eq!(lhs.expr_num_lit().expect("number literal").token.fragment(source), "1");
         assert_eq!(rhs.expr_num_lit().expect("number literal").token.fragment(source), "2");
     }
@@ -164,13 +182,15 @@ fn test_simple_call_arithm_arg() {
             .expr_bin_op()
             .unwrap();
 
-        assert_eq!(operator.fragment(source), "-");
+        assert_eq!(operator.kind, OperatorKind::Sub);
+        assert_eq!(operator.token.kind, TokenKind::Sub);
+        assert_eq!(operator.token.fragment(source), "-");
         assert_eq!(lhs.expr_num_lit().unwrap().token.fragment(source), "2");
 
         // "... 4 * 5"
         let BinaryOp { operator, lhs, rhs } = rhs.expr_bin_op().unwrap();
 
-        assert_eq!(operator.fragment(source), "*");
+        assert_eq!(operator.token.fragment(source), "*");
         assert_eq!(lhs.expr_num_lit().unwrap().token.fragment(source), "4");
         assert_eq!(rhs.expr_num_lit().unwrap().token.fragment(source), "5");
     }

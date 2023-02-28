@@ -1,9 +1,22 @@
 [package]
 name = "vuur"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[profile.release]
+# Increases runtime performance because
+# LLVM has more oppertunities to inline functions.
+#
+# Slows down compilation.
+codegen-units = 1
+lto = "fat"
+# Include debug symbols.
+debug = true
+
 [dependencies]
 vuur_lexer = { path = "../vuur_lexer" }
+vuur_parse = { path = "../vuur_parse" }
+vuur_compile = { path = "../vuur_compile" }
+vuur_vm = { path = "../vuur_vm" }
