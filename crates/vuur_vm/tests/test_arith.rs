@@ -66,6 +66,27 @@ fn test_arithmetic() {
     for (index, (code, expected)) in cases.iter().cloned().enumerate() {
         let mut vm = vuur_vm::VM::new();
         let chunk = Chunk::new(format!("case_{}", index), code.iter().cloned().collect());
+        println!("test arithmetic {}", chunk.name());
+        assert_eq!(vm.run(&chunk), expected);
+    }
+}
+
+// TODO: Retrieve error from VM
+#[test]
+fn test_arithmetic_error() {
+    let cases: &[(PROGRAM, RESULT)] = &[(
+        &[
+            encode_a(PUSH_CONST_IMM, 42),
+            encode_a(PUSH_CONST_IMM, 0),
+            encode_simple(DIV_I32),
+        ],
+        None,
+    )];
+
+    for (index, (code, expected)) in cases.iter().cloned().enumerate() {
+        let mut vm = vuur_vm::VM::new();
+        let chunk = Chunk::new(format!("case_{}", index), code.iter().cloned().collect());
+        println!("test arithmetic {}", chunk.name());
         assert_eq!(vm.run(&chunk), expected);
     }
 }
