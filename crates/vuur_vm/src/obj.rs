@@ -5,7 +5,6 @@
 use std::{alloc::Layout, rc::Rc};
 
 // TODO: ObjInfo identity to detect cycling types
-// TODO:
 
 // ----------------------------------------------------------------------------
 // Object Value
@@ -165,6 +164,7 @@ impl ObjInfo {
     fn build_layout(fields: &[FieldKind]) -> (Vec<FieldInfo>, usize) {
         let mut layout = vec![];
         let mut offset: usize = 0;
+        let mut max_align: usize = 0;
 
         for kind in fields.iter().copied() {
             // Align the offset of this field.
@@ -182,11 +182,16 @@ impl ObjInfo {
 
             // Possibly unaligned offset where next field starts.
             offset = aligned_offset + kind.size();
+
+            // Track the largest alignment for determing padding trail later.
+            max_align = max_align.max(align);
         }
 
-        // TODO: Trailing padding so objects in an array are aligned.
+        // The total size of the object must be a multiple of the largest
+        // alignment of any structure member.
+        let size = offset + ((max_align - (offset % max_align)) % max_align);
 
-        (layout, offset)
+        (layout, size)
     }
 
     /// Size of a value of this type in number of bytes.
@@ -299,17 +304,26 @@ impl_as_field!(f64, F64);
 mod test {
     use super::*;
 
+    // #[repr(C)]
+    // struct Foobar {
+    //     field1: u8,
+    //     field2: u16,
+    //     field3: u8,
+    //     field4: u32,
+    // }
+
     #[test]
     fn test_build_layout() {
         #[cfg(any(target_arch = "x86_64", target_arch = "powerpc64", target_arch = "aarch64",))]
         let expected = &[0, 2, 4, 8];
 
-        let (layout, _) = ObjInfo::build_layout(&[FieldKind::U8, FieldKind::U16, FieldKind::U8, FieldKind::U32]);
+        let (layout, size) = ObjInfo::build_layout(&[FieldKind::U8, FieldKind::U16, FieldKind::U8, FieldKind::U32]);
 
         assert_eq!(layout[0].offset, expected[0], "first field must be at start of object");
         assert_eq!(layout[1].offset, expected[1], "second field must be padded");
         assert_eq!(layout[2].offset, expected[2], "third field must not be padded");
         assert_eq!(layout[3].offset, expected[3], "third field must be padded");
+        assert_eq!(size, 12);
     }
 
     #[test]
