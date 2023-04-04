@@ -380,14 +380,6 @@ impl_as_field!(f64, F64);
 mod test {
     use super::*;
 
-    // #[repr(C)]
-    // struct Foobar {
-    //     field1: u8,
-    //     field2: u16,
-    //     field3: u8,
-    //     field4: u32,
-    // }
-
     #[cfg(any(target_arch = "x86_64", target_arch = "powerpc64", target_arch = "aarch64",))]
     const EXPECTED: &[u16] = &[0, 2, 4, 8];
 
