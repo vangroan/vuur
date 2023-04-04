@@ -2,7 +2,7 @@
 //!
 //! References:
 //! - https://en.wikipedia.org/wiki/Data_structure_alignment
-use std::{alloc::Layout, rc::Rc};
+use std::{alloc::Layout, cmp::Reverse, rc::Rc};
 
 // TODO: ObjInfo identity to detect cycling types
 
@@ -128,6 +128,7 @@ pub enum LayoutScheme {
     C99,
 }
 
+#[derive(Debug)]
 pub struct FieldInfo {
     offset: u16,
     kind: FieldKind,
@@ -152,16 +153,19 @@ pub enum FieldKind {
 }
 
 impl ObjInfo {
-    pub fn new(fields: &[FieldKind]) -> Self {
-        let (layout, size) = Self::build_layout(fields);
-
-        // TODO: Support reordering fields
-        let scheme = LayoutScheme::C99;
-
+    pub fn new(scheme: LayoutScheme, fields: &[FieldKind]) -> Self {
+        let (layout, size) = Self::build_layout(scheme, fields);
         Self { layout, size, scheme }
     }
 
-    fn build_layout(fields: &[FieldKind]) -> (Vec<FieldInfo>, usize) {
+    fn build_layout(scheme: LayoutScheme, fields: &[FieldKind]) -> (Vec<FieldInfo>, usize) {
+        // Descriptors need to be copied, because the layout can
+        // optionally be reordered.
+        let mut fields = fields.iter().copied().collect::<Vec<_>>();
+        if scheme == LayoutScheme::Reorder {
+            Self::reorder_layout(&mut fields);
+        }
+
         let mut layout = vec![];
         let mut offset: usize = 0;
         let mut max_align: usize = 0;
@@ -192,6 +196,12 @@ impl ObjInfo {
         let size = offset + ((max_align - (offset % max_align)) % max_align);
 
         (layout, size)
+    }
+
+    /// Reorder the fields to optimize for space.
+    fn reorder_layout(layout: &mut [FieldKind]) {
+        // Order largest to smallest.
+        layout.sort_by_key(|kind| Reverse(kind.size()));
     }
 
     /// Size of a value of this type in number of bytes.
@@ -312,28 +322,44 @@ mod test {
     //     field4: u32,
     // }
 
+    #[cfg(any(target_arch = "x86_64", target_arch = "powerpc64", target_arch = "aarch64",))]
+    const EXPECTED: &[u16] = &[0, 2, 4, 8];
+
     #[test]
     fn test_build_layout() {
-        #[cfg(any(target_arch = "x86_64", target_arch = "powerpc64", target_arch = "aarch64",))]
-        let expected = &[0, 2, 4, 8];
+        let (layout, size) = ObjInfo::build_layout(
+            LayoutScheme::C99,
+            &[FieldKind::U8, FieldKind::U16, FieldKind::U8, FieldKind::U32],
+        );
 
-        let (layout, size) = ObjInfo::build_layout(&[FieldKind::U8, FieldKind::U16, FieldKind::U8, FieldKind::U32]);
-
-        assert_eq!(layout[0].offset, expected[0], "first field must be at start of object");
-        assert_eq!(layout[1].offset, expected[1], "second field must be padded");
-        assert_eq!(layout[2].offset, expected[2], "third field must not be padded");
-        assert_eq!(layout[3].offset, expected[3], "third field must be padded");
+        assert_eq!(layout[0].offset, EXPECTED[0], "first field must be at start of object");
+        assert_eq!(layout[1].offset, EXPECTED[1], "second field must be padded");
+        assert_eq!(layout[2].offset, EXPECTED[2], "third field must not be padded");
+        assert_eq!(layout[3].offset, EXPECTED[3], "third field must be padded");
         assert_eq!(size, 12);
     }
 
     #[test]
+    fn test_reorder_layout() {
+        let obj_info = Rc::new(ObjInfo::new(
+            LayoutScheme::Reorder,
+            &[FieldKind::U8, FieldKind::U16, FieldKind::U8, FieldKind::U32],
+        ));
+
+        assert_eq!(obj_info.size, 8);
+
+        let mut obj = Obj::new(obj_info);
+        // FIXME: Field indices must not change when reordered
+        obj.set_field::<u32>(0, 1234);
+        assert_eq!(obj.field::<u32>(0), Some(&1234));
+    }
+
+    #[test]
     fn test_field_access() {
-        let ty = Rc::new(ObjInfo::new(&[
-            FieldKind::U8,
-            FieldKind::U16,
-            FieldKind::U8,
-            FieldKind::U32,
-        ]));
+        let ty = Rc::new(ObjInfo::new(
+            LayoutScheme::C99,
+            &[FieldKind::U8, FieldKind::U16, FieldKind::U8, FieldKind::U32],
+        ));
 
         let mut obj = Obj::new(ty);
 
