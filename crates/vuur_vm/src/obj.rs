@@ -2,7 +2,7 @@
 //!
 //! References:
 //! - https://en.wikipedia.org/wiki/Data_structure_alignment
-use std::{alloc::Layout, cmp::Reverse, rc::Rc};
+use std::{alloc::Layout, cmp::Reverse, fmt, rc::Rc};
 
 // TODO: ObjInfo identity to detect cycling types
 
@@ -72,17 +72,36 @@ impl Obj {
     }
 }
 
+impl fmt::Display for Obj {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let name = self.ty.name.as_str();
+        let ptr = self.data.as_ptr();
+        write!(f, "{name}<{ptr:?}>")
+    }
+}
+
 // ----------------------------------------------------------------------------
 // Construction and Descriptors
 
 pub struct ObjBuilder {
+    name: Option<String>,
+    scheme: Option<LayoutScheme>,
     fields: Vec<FieldDesc>,
 }
 
 impl ObjBuilder {
     #[must_use]
     pub fn new() -> Self {
-        Self { fields: vec![] }
+        Self {
+            name: None,
+            scheme: None,
+            fields: vec![],
+        }
+    }
+
+    pub fn with_name(mut self, name: &str) -> Self {
+        self.name = Some(name.to_string());
+        self
     }
 
     pub fn with_field(mut self, name: &str, kind: FieldKind) -> Self {
@@ -98,15 +117,55 @@ impl ObjBuilder {
     }
 
     pub fn build(self) -> ObjInfo {
-        let Self { .. } = self;
-        todo!()
+        let Self {
+            name, scheme, fields, ..
+        } = self;
+
+        let name = name.unwrap_or_else(|| ObjDesc::DEFAULT_NAME.to_string());
+        let scheme = scheme.unwrap_or(ObjDesc::DEFAULT_SCHEME);
+
+        let kinds = fields
+            .iter()
+            .map(|f| {
+                if let FieldDesc::Value { kind, .. } = f {
+                    *kind
+                } else {
+                    todo!("nested objects")
+                }
+            })
+            .collect::<Vec<_>>();
+        let (layout, size) = ObjInfo::build_layout(scheme, &kinds);
+        ObjInfo {
+            layout,
+            name,
+            size,
+            scheme,
+        }
     }
 }
 
-/// Field Descriptor
+/// Object type descriptor, for use when constructing a new type.
+pub struct ObjDesc {
+    /// Identifier for the type.
+    pub name: Option<String>,
+    /// Fully qualified name that disambiguates the type name.
+    /// This could be any nesting, or namespacing, like a module path.
+    ///
+    /// If `None`, the [`ObjDesc::name`] field is used as the fully qualified name.
+    pub qual_name: Option<String>,
+    pub scheme: LayoutScheme,
+    pub fields: Vec<FieldDesc>,
+}
+
+/// Field descriptor
 pub enum FieldDesc {
     Value { name: String, kind: FieldKind },
     Nested { name: String, obj: Rc<ObjInfo> },
+}
+
+impl ObjDesc {
+    pub const DEFAULT_NAME: &str = "Unknown";
+    pub const DEFAULT_SCHEME: LayoutScheme = LayoutScheme::C99;
 }
 
 // ----------------------------------------------------------------------------
@@ -115,6 +174,7 @@ pub enum FieldDesc {
 /// Type information for object.
 pub struct ObjInfo {
     layout: Vec<FieldInfo>,
+    name: String,
     /// Size of a value of this type in number of bytes.
     size: usize,
     scheme: LayoutScheme,
@@ -154,8 +214,14 @@ pub enum FieldKind {
 
 impl ObjInfo {
     pub fn new(scheme: LayoutScheme, fields: &[FieldKind]) -> Self {
+        let name = ObjDesc::DEFAULT_NAME.to_string();
         let (layout, size) = Self::build_layout(scheme, fields);
-        Self { layout, size, scheme }
+        Self {
+            layout,
+            name,
+            size,
+            scheme,
+        }
     }
 
     fn build_layout(scheme: LayoutScheme, fields: &[FieldKind]) -> (Vec<FieldInfo>, usize) {
@@ -385,11 +451,17 @@ mod test {
 
     #[test]
     fn test_builder() {
-        let _obj_info = ObjBuilder::new()
+        let obj_info = ObjBuilder::new()
+            .with_name("Message")
             .with_field("one", FieldKind::U8)
             .with_field("two", FieldKind::U16)
             .with_field("three", FieldKind::U8)
             .with_field("four", FieldKind::U32)
             .build();
+
+        let obj_info = Rc::new(obj_info);
+
+        let obj = Obj::new(obj_info);
+        println!("{obj}");
     }
 }
