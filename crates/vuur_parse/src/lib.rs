@@ -13,6 +13,7 @@ pub mod expr;
 pub mod func;
 pub mod ident;
 pub mod module;
+pub mod pprint;
 pub mod stmt;
 pub mod stream;
 mod ty;
