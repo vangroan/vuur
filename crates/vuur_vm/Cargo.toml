@@ -7,3 +7,6 @@ edition = "2021"
 
 [dependencies]
 vuur_compile = { path = "../vuur_compile" }
+
+# Dynamic Objects
+bytemuck = "1.13"

@@ -6,6 +6,7 @@ use vuur_compile::constants::CHUNK_HEADER_RESERVED;
 use vuur_compile::Chunk;
 
 pub mod error;
+pub mod obj;
 
 use self::error::{ErrorKind, Result, RuntimeError};
 
