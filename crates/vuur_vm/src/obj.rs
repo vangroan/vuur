@@ -1,4 +1,4 @@
-//! Dynamic Object
+//! Data Structure with layout defined at runtime.
 //!
 //! References:
 //! - https://en.wikipedia.org/wiki/Data_structure_alignment
