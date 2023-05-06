@@ -105,6 +105,7 @@ impl<'a> Lexer<'a> {
                     }
                 }
                 '*' => self.make_token(TokenKind::Mul),
+                '/' => self.make_token(TokenKind::Div),
                 '&' => self.make_token(TokenKind::Ampersand),
                 ',' => self.make_token(TokenKind::Comma),
                 ':' => self.make_token(TokenKind::Colon),

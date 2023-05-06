@@ -1,3 +1,4 @@
+pub use std::cell::Ref;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -6,6 +7,7 @@ use vuur_compile::constants::CHUNK_HEADER_RESERVED;
 use vuur_compile::Chunk;
 
 pub mod error;
+pub mod obj;
 
 use self::error::{ErrorKind, Result, RuntimeError};
 
@@ -28,6 +30,8 @@ pub struct Fiber {
     pub(crate) calls: Vec<FrameInfo>,
     /// Indicates if the fiber intends to resume execution in the future
     pub(crate) done: bool,
+    /// ---------------------------
+    pub(crate) error: Option<String>,
 }
 
 #[derive(Debug)]
@@ -51,13 +55,22 @@ impl VM {
         }
     }
 
+    /// The current fiber that the VM will execute when resumed.
+    #[inline]
+    pub fn fiber(&self) -> Ref<'_, Fiber> {
+        self.fiber.borrow()
+    }
+
     // TODO: Return value from finished fiber
     pub fn run(&mut self, chunk: &Chunk) -> Option<u32> {
         match (*self.fiber).try_borrow_mut() {
             Ok(mut fiber) => {
                 fiber.ip = 0;
                 fiber.run(chunk);
-                if fiber.done {
+                if let Some(error) = &fiber.error {
+                    println!("runtime error: {}", error);
+                    None
+                } else if fiber.done {
                     // Fiber is done executing, and cannot be resumed.
                     match fiber.take_return() {
                         Ok(return_value) => Some(return_value),
@@ -96,6 +109,7 @@ impl Fiber {
                 return_addr: END_OF_CHUNK,
             }],
             done: false,
+            error: None,
         }
     }
 
@@ -115,9 +129,15 @@ impl Fiber {
         'eval: loop {
             if self.ip >= chunk.code().len() {
                 println!("end-of-chunk");
-                self.done = true;
+                self.complete();
                 break 'eval;
             }
+
+            if self.error.is_some() {
+                self.complete();
+                break 'eval;
+            }
+
             let instruction = chunk.code()[self.ip];
 
             {
@@ -157,8 +177,20 @@ impl Fiber {
                     self.stack.push(c as u32);
                     self.ip += 1
                 }
+                ops::DIV_I32 => {
+                    println!(".div");
+                    let b = self.stack.pop().unwrap_or_default() as i32;
+                    let a = self.stack.pop().unwrap_or_default() as i32;
+                    match a.checked_div(b) {
+                        Some(c) => {
+                            self.stack.push(c as u32);
+                            self.ip += 1;
+                        }
+                        None => self.set_error("divide by zero"),
+                    }
+                }
                 ops::NEG_I32 => {
-                    println!(".mul");
+                    println!(".neg");
                     let b = self.stack.pop().unwrap_or_default() as i32;
                     self.stack.push(-b as u32);
                     self.ip += 1;
@@ -200,6 +232,31 @@ impl Fiber {
                 }
             }
         }
+    }
+
+    /// Sets the fiber to an error state, storing the error message
+    /// for later retrieval. See [`Self::error()`]
+    #[cold]
+    fn set_error<S: ToString>(&mut self, message: S) {
+        self.error = Some(message.to_string())
+    }
+
+    /// Retrieve the fiber's current error, if any.
+    pub fn error(&self) -> Option<&str> {
+        self.error.as_ref().map(|s| s.as_str())
+    }
+
+    /// Checks whether the fiber is in an error state.
+    pub fn has_error(&self) -> bool {
+        self.error.is_some()
+    }
+
+    /// Mark the fiber as completed.
+    ///
+    /// A cold function call in a branch will mark that branch as unlikely.
+    #[cold]
+    fn complete(&mut self) {
+        self.done = true
     }
 
     fn print_ip(&self) {

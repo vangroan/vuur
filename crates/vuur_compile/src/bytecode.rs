@@ -99,6 +99,12 @@ pub fn decode_arg_a(instruction: u32) -> i32 {
     ((instruction & 0xFFFFFF00) >> 8) as i32
 }
 
+#[inline]
+pub fn encode_simple(op: OpCode) -> u32 {
+    // opcode is in least significant bit
+    op as u32
+}
+
 pub fn encode_k(op: OpCode, k: u32) -> u32 {
     debug_assert!(k <= 0xFFFFFF, "argument k must fit in 24 bits");
     (op as u32) | ((k & 0xFFFFFF) << 8)
