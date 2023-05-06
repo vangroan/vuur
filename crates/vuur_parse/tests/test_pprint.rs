@@ -18,6 +18,8 @@ const CASES: &[&str] = &[
     "1 * 2 * 3",
     "1 + 2 - 3 * 4",
     "1 + (2 - 3) * 4 / 5",
+    "-1",
+    "1 + (-2)",
 ];
 
 #[test]
@@ -25,6 +27,7 @@ fn test_expr_pretty_print() {
     for case in CASES {
         let expr = parse_expr(case).unwrap();
         let pprint = PrettyExpr::new(&expr);
+        println!("{case}");
         println!("{pprint}");
     }
 }

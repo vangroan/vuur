@@ -38,6 +38,17 @@ impl<'a> PrettyExpr<'a> {
     fn fmt_expr(&self, f: &mut Formatter, expr: &Expr) -> std::fmt::Result {
         match expr {
             Expr::Num(num) => writeln!(f, "number \"{}\"", num.value)?,
+            Expr::Unary(unary) => {
+                // op
+                self.fmt_operator(f, &unary.operator)?;
+
+                // rhs
+                self.fmt_prefix(f)?;
+                write!(f, "{}", "└─".green())?;
+                self.push_prefix("  ");
+                self.fmt_expr(f, &unary.rhs)?;
+                self.pop_prefix(2);
+            }
             Expr::Binary(binary) => {
                 // op
                 self.fmt_operator(f, &binary.operator)?;
