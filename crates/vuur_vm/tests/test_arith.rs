@@ -75,6 +75,7 @@ fn test_arithmetic() {
 #[test]
 fn test_arithmetic_error() {
     let cases: &[(PROGRAM, RESULT)] = &[(
+        // divide by zero
         &[
             encode_a(PUSH_CONST_IMM, 42),
             encode_a(PUSH_CONST_IMM, 0),
@@ -88,5 +89,8 @@ fn test_arithmetic_error() {
         let chunk = Chunk::new(format!("case_{}", index), code.iter().cloned().collect());
         println!("test arithmetic {}", chunk.name());
         assert_eq!(vm.run(&chunk), expected);
+        let fiber = vm.fiber();
+        assert!(fiber.has_error());
+        assert_eq!(fiber.error(), Some("divide by zero"));
     }
 }

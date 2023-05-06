@@ -1,3 +1,4 @@
+pub use std::cell::Ref;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -52,6 +53,12 @@ impl VM {
         Self {
             fiber: Rc::new(RefCell::new(Fiber::new())),
         }
+    }
+
+    /// The current fiber that the VM will execute when resumed.
+    #[inline]
+    pub fn fiber(&self) -> Ref<'_, Fiber> {
+        self.fiber.borrow()
     }
 
     // TODO: Return value from finished fiber
@@ -227,9 +234,21 @@ impl Fiber {
         }
     }
 
+    /// Sets the fiber to an error state, storing the error message
+    /// for later retrieval. See [`Self::error()`]
     #[cold]
     fn set_error<S: ToString>(&mut self, message: S) {
         self.error = Some(message.to_string())
+    }
+
+    /// Retrieve the fiber's current error, if any.
+    pub fn error(&self) -> Option<&str> {
+        self.error.as_ref().map(|s| s.as_str())
+    }
+
+    /// Checks whether the fiber is in an error state.
+    pub fn has_error(&self) -> bool {
+        self.error.is_some()
     }
 
     /// Mark the fiber as completed.
