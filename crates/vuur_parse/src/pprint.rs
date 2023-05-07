@@ -75,7 +75,7 @@ impl<'a> PrettyExpr<'a> {
                 // lhs
                 self.fmt_prefix(f)?;
                 self.write_colour(f, "├─", color::FG_GREEN)?;
-                self.push_prefix("| ");
+                self.push_prefix("│ ");
                 self.fmt_expr(f, &binary.lhs)?;
                 self.pop_prefix(2);
 
@@ -126,7 +126,8 @@ impl<'a> PrettyExpr<'a> {
                 // lhs
                 self.fmt_prefix(f)?;
                 self.write_colour(f, "├─", color::FG_GREEN)?;
-                self.push_prefix("| ");
+                self.write_colour(f, "lhs: ", color::FG_YELLOW)?;
+                self.push_prefix("│ ");
                 self.fmt_member_path(f, &assign.path)?;
                 self.pop_prefix(2);
 
@@ -137,6 +138,7 @@ impl<'a> PrettyExpr<'a> {
                 // rhs
                 self.fmt_prefix(f)?;
                 self.write_colour(f, "└─", color::FG_GREEN)?;
+                self.write_colour(f, "rhs: ", color::FG_YELLOW)?;
                 self.push_prefix("  ");
                 self.fmt_expr(f, &assign.rhs)?;
                 self.pop_prefix(2);
@@ -147,7 +149,7 @@ impl<'a> PrettyExpr<'a> {
                 // callee
                 self.fmt_prefix(f)?;
                 self.write_colour(f, "├─", color::FG_GREEN)?;
-                self.push_prefix("| ");
+                self.push_prefix("│ ");
                 self.fmt_expr(f, &call.callee)?;
                 self.pop_prefix(2);
 
@@ -164,7 +166,7 @@ impl<'a> PrettyExpr<'a> {
                     } else {
                         self.write_colour(f, "├─", color::FG_GREEN)?;
                     }
-                    self.push_prefix("| ");
+                    self.push_prefix("│ ");
                     self.fmt_call_arg(f, arg)?;
                     self.pop_prefix(2);
                 }
@@ -198,7 +200,7 @@ impl<'a> PrettyExpr<'a> {
         // path
         self.fmt_prefix(f)?;
         self.write_colour(f, "├─", color::FG_GREEN)?;
-        self.push_prefix("| ");
+        self.push_prefix("│ ");
         self.fmt_member_path(f, &access.path)?;
         self.pop_prefix(2);
 
