@@ -27,6 +27,8 @@ const CASES: &[&str] = &[
     "z = x + y * 32",
     "one.two.three",
     "one.two.three = x * y",
+    "one(2 + 3, 4 * 5, 6, seven)",
+    "position = Vector(3, 4)",
 ];
 
 #[test]

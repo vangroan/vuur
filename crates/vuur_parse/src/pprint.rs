@@ -2,7 +2,7 @@
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
 
-use crate::expr::{Expr, MemberAccess, MemberPath, Operator, OperatorKind};
+use crate::expr::{CallArg, Expr, MemberAccess, MemberPath, Operator, OperatorKind};
 use crate::ident::Ident;
 
 #[allow(dead_code)]
@@ -93,11 +93,13 @@ impl<'a> PrettyExpr<'a> {
                 // lhs
                 self.fmt_prefix(f)?;
                 self.write_colour(f, "├─", color::FG_GREEN)?;
+                self.write_colour(f, "lhs: ", color::FG_YELLOW)?;
                 self.fmt_ident(f, &assign.lhs)?;
 
                 // rhs
                 self.fmt_prefix(f)?;
                 self.write_colour(f, "└─", color::FG_GREEN)?;
+                self.write_colour(f, "rhs: ", color::FG_YELLOW)?;
                 self.push_prefix("  ");
                 self.fmt_expr(f, &assign.rhs)?;
                 self.pop_prefix(2);
@@ -139,7 +141,35 @@ impl<'a> PrettyExpr<'a> {
                 self.fmt_expr(f, &assign.rhs)?;
                 self.pop_prefix(2);
             }
-            _ => todo!("{expr:?}"),
+            Expr::Call(call) => {
+                writeln!(f, "call")?;
+
+                // callee
+                self.fmt_prefix(f)?;
+                self.write_colour(f, "├─", color::FG_GREEN)?;
+                self.push_prefix("| ");
+                self.fmt_expr(f, &call.callee)?;
+                self.pop_prefix(2);
+
+                // arguments
+                self.fmt_prefix(f)?;
+                self.write_colour(f, "└─", color::FG_GREEN)?;
+                writeln!(f, "args {FG_BLUE}{}{FG_WHITE}", call.args.len())?;
+
+                self.push_prefix("  ");
+                for (index, arg) in call.args.iter().enumerate() {
+                    self.fmt_prefix(f)?;
+                    if index == call.args.len() - 1 {
+                        self.write_colour(f, "└─", color::FG_GREEN)?;
+                    } else {
+                        self.write_colour(f, "├─", color::FG_GREEN)?;
+                    }
+                    self.push_prefix("| ");
+                    self.fmt_call_arg(f, arg)?;
+                    self.pop_prefix(2);
+                }
+                self.pop_prefix(2);
+            }
         }
 
         Ok(())
@@ -189,9 +219,7 @@ impl<'a> PrettyExpr<'a> {
             MemberPath::Name(ident) => {
                 self.fmt_prefix(f)?;
                 self.write_colour(f, "└─", color::FG_GREEN)?;
-                self.push_prefix("| ");
                 self.fmt_ident(f, ident)?;
-                self.pop_prefix(2);
             }
             MemberPath::Path(access) => {
                 self.fmt_prefix(f)?;
@@ -203,6 +231,30 @@ impl<'a> PrettyExpr<'a> {
         }
 
         Ok(())
+    }
+
+    fn fmt_call_arg(&self, f: &mut Formatter, arg: &CallArg) -> std::fmt::Result {
+        match arg {
+            CallArg::Simple(expr) => self.fmt_expr(f, expr),
+            CallArg::Named { name, rhs } => {
+                writeln!(f, "named_arg")?;
+
+                // name
+                self.fmt_prefix(f)?;
+                self.write_colour(f, "├─", color::FG_GREEN)?;
+                self.fmt_ident(f, name)?;
+
+                // rhs
+                self.fmt_prefix(f)?;
+                self.write_colour(f, "└─", color::FG_GREEN)?;
+                self.push_prefix("  ");
+                self.fmt_expr(f, rhs)?;
+                self.pop_prefix(2);
+
+                Ok(())
+            }
+            CallArg::Block(_block) => todo!(),
+        }
     }
 }
 
