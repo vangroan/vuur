@@ -1,11 +1,21 @@
 //! AST pretty-printer
-use std::borrow::Borrow;
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
 
-use colored::*;
-
 use crate::expr::{Expr, Operator, OperatorKind};
+
+#[allow(dead_code)]
+#[rustfmt::skip]
+mod color {
+    pub(super) const FG_BLACK:   &str = "\x1b[30m";
+    pub(super) const FG_RED:     &str = "\x1b[31m";
+    pub(super) const FG_GREEN:   &str = "\x1b[32m";
+    pub(super) const FG_YELLOW:  &str = "\x1b[33m";
+    pub(super) const FG_BLUE:    &str = "\x1b[34m";
+    pub(super) const FG_MAGENTA: &str = "\x1b[35m";
+    pub(super) const FG_CYAN:    &str = "\x1b[36m";
+    pub(super) const FG_WHITE:   &str = "\x1b[37m";
+}
 
 pub struct PrettyExpr<'a> {
     expr: &'a Expr,
@@ -16,7 +26,7 @@ impl<'a> PrettyExpr<'a> {
     pub fn new(expr: &'a Expr) -> Self {
         Self {
             expr,
-            depth: RefCell::new(String::new()),
+            depth: RefCell::new(String::with_capacity(0xFF)),
         }
     }
 
@@ -32,19 +42,27 @@ impl<'a> PrettyExpr<'a> {
     }
 
     fn fmt_prefix(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.depth.borrow().green())
+        use color::*;
+        write!(f, "{FG_GREEN}{}{FG_WHITE}", self.depth.borrow())
+    }
+
+    fn write_colour(&self, f: &mut Formatter, text: &str, color: &str) -> std::fmt::Result {
+        use color::*;
+        write!(f, "{color}{text}{FG_WHITE}")
     }
 
     fn fmt_expr(&self, f: &mut Formatter, expr: &Expr) -> std::fmt::Result {
+        use color::*;
+
         match expr {
-            Expr::Num(num) => writeln!(f, "number \"{}\"", num.value)?,
+            Expr::Num(num) => writeln!(f, "number {FG_MAGENTA}\"{}\"{FG_WHITE}", num.value)?,
             Expr::Unary(unary) => {
                 // op
                 self.fmt_operator(f, &unary.operator)?;
 
                 // rhs
                 self.fmt_prefix(f)?;
-                write!(f, "{}", "└─".green())?;
+                self.write_colour(f, "└─", color::FG_GREEN)?;
                 self.push_prefix("  ");
                 self.fmt_expr(f, &unary.rhs)?;
                 self.pop_prefix(2);
@@ -55,14 +73,14 @@ impl<'a> PrettyExpr<'a> {
 
                 // lhs
                 self.fmt_prefix(f)?;
-                write!(f, "{}", "├─".green())?;
+                self.write_colour(f, "├─", color::FG_GREEN)?;
                 self.push_prefix("| ");
                 self.fmt_expr(f, &binary.lhs)?;
                 self.pop_prefix(2);
 
                 // rhs
                 self.fmt_prefix(f)?;
-                write!(f, "{}", "└─".green())?;
+                self.write_colour(f, "└─", color::FG_GREEN)?;
                 self.push_prefix("  ");
                 self.fmt_expr(f, &binary.rhs)?;
                 self.pop_prefix(2);
@@ -71,7 +89,7 @@ impl<'a> PrettyExpr<'a> {
                 writeln!(f, "group")?;
 
                 self.fmt_prefix(f)?;
-                write!(f, "{}", "└─".green())?;
+                self.write_colour(f, "└─", color::FG_GREEN)?;
                 self.push_prefix("  ");
                 self.fmt_expr(f, &group.expr)?;
                 self.pop_prefix(2);
