@@ -2,7 +2,8 @@
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter};
 
-use crate::expr::{Expr, Operator, OperatorKind};
+use crate::expr::{Expr, MemberAccess, MemberPath, Operator, OperatorKind};
+use crate::ident::Ident;
 
 #[allow(dead_code)]
 #[rustfmt::skip]
@@ -55,7 +56,7 @@ impl<'a> PrettyExpr<'a> {
         use color::*;
 
         match expr {
-            Expr::Num(num) => writeln!(f, "number {FG_MAGENTA}\"{}\"{FG_WHITE}", num.value)?,
+            Expr::Unknown => writeln!(f, "unknown")?,
             Expr::Unary(unary) => {
                 // op
                 self.fmt_operator(f, &unary.operator)?;
@@ -85,6 +86,25 @@ impl<'a> PrettyExpr<'a> {
                 self.fmt_expr(f, &binary.rhs)?;
                 self.pop_prefix(2);
             }
+            Expr::Assign(assign) => {
+                // op
+                writeln!(f, "assign")?;
+
+                // lhs
+                self.fmt_prefix(f)?;
+                self.write_colour(f, "├─", color::FG_GREEN)?;
+                self.push_prefix("| ");
+                self.fmt_ident(f, &assign.lhs)?;
+                self.pop_prefix(2);
+
+                // rhs
+                self.fmt_prefix(f)?;
+                self.write_colour(f, "└─", color::FG_GREEN)?;
+                self.push_prefix("  ");
+                self.fmt_expr(f, &assign.rhs)?;
+                self.pop_prefix(2);
+            }
+            Expr::Num(num) => writeln!(f, "number {FG_MAGENTA}\"{}\"{FG_WHITE}", num.value)?,
             Expr::Group(group) => {
                 writeln!(f, "group")?;
 
@@ -93,6 +113,12 @@ impl<'a> PrettyExpr<'a> {
                 self.push_prefix("  ");
                 self.fmt_expr(f, &group.expr)?;
                 self.pop_prefix(2);
+            }
+            Expr::NameAccess(access) => {
+                writeln!(f, "name_access {FG_MAGENTA}\"{}\"{FG_WHITE}", access.ident.text)?;
+            }
+            Expr::MemberAccess(access) => {
+                self.fmt_member_access(f, access)?;
             }
             _ => todo!("{expr:?}"),
         }
@@ -110,6 +136,54 @@ impl<'a> PrettyExpr<'a> {
             OperatorKind::Assign => writeln!(f, "assign"),
             OperatorKind::Equals => writeln!(f, "equals"),
         }
+    }
+
+    fn fmt_ident(&self, f: &mut Formatter, ident: &Ident) -> std::fmt::Result {
+        use color::*;
+        writeln!(f, "ident {FG_MAGENTA}\"{}\"{FG_WHITE}", ident.text)
+    }
+
+    fn fmt_member_access(&self, f: &mut Formatter, access: &MemberAccess) -> std::fmt::Result {
+        writeln!(f, "member_access")?;
+
+        // path
+        self.fmt_prefix(f)?;
+        self.write_colour(f, "├─", color::FG_GREEN)?;
+        self.push_prefix("| ");
+        self.fmt_member_path(f, &access.path)?;
+        self.pop_prefix(2);
+
+        // name
+        self.fmt_prefix(f)?;
+        self.write_colour(f, "└─", color::FG_GREEN)?;
+        self.push_prefix("  ");
+        self.fmt_ident(f, &access.name)?;
+        self.pop_prefix(2);
+
+        Ok(())
+    }
+
+    fn fmt_member_path(&self, f: &mut Formatter, path: &MemberPath) -> std::fmt::Result {
+        writeln!(f, "member_path")?;
+
+        match path {
+            MemberPath::Name(ident) => {
+                self.fmt_prefix(f)?;
+                self.write_colour(f, "└─", color::FG_GREEN)?;
+                self.push_prefix("| ");
+                self.fmt_ident(f, ident)?;
+                self.pop_prefix(2);
+            }
+            MemberPath::Path(access) => {
+                self.fmt_prefix(f)?;
+                self.write_colour(f, "└─", color::FG_GREEN)?;
+                self.push_prefix("  ");
+                self.fmt_member_access(f, access)?;
+                self.pop_prefix(2);
+            }
+        }
+
+        Ok(())
     }
 }
 
