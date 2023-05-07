@@ -163,10 +163,11 @@ impl<'a> PrettyExpr<'a> {
                     self.fmt_prefix(f)?;
                     if index == call.args.len() - 1 {
                         self.write_colour(f, "└─", color::FG_GREEN)?;
+                        self.push_prefix("  ");
                     } else {
                         self.write_colour(f, "├─", color::FG_GREEN)?;
+                        self.push_prefix("│ ");
                     }
-                    self.push_prefix("│ ");
                     self.fmt_call_arg(f, arg)?;
                     self.pop_prefix(2);
                 }
