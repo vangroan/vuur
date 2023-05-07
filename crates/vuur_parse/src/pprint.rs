@@ -93,9 +93,7 @@ impl<'a> PrettyExpr<'a> {
                 // lhs
                 self.fmt_prefix(f)?;
                 self.write_colour(f, "├─", color::FG_GREEN)?;
-                self.push_prefix("| ");
                 self.fmt_ident(f, &assign.lhs)?;
-                self.pop_prefix(2);
 
                 // rhs
                 self.fmt_prefix(f)?;
@@ -119,6 +117,27 @@ impl<'a> PrettyExpr<'a> {
             }
             Expr::MemberAccess(access) => {
                 self.fmt_member_access(f, access)?;
+            }
+            Expr::MemberAssign(assign) => {
+                writeln!(f, "member_assign")?;
+
+                // lhs
+                self.fmt_prefix(f)?;
+                self.write_colour(f, "├─", color::FG_GREEN)?;
+                self.push_prefix("| ");
+                self.fmt_member_path(f, &assign.path)?;
+                self.pop_prefix(2);
+
+                self.fmt_prefix(f)?;
+                self.write_colour(f, "├─", color::FG_GREEN)?;
+                self.fmt_ident(f, &assign.name)?;
+
+                // rhs
+                self.fmt_prefix(f)?;
+                self.write_colour(f, "└─", color::FG_GREEN)?;
+                self.push_prefix("  ");
+                self.fmt_expr(f, &assign.rhs)?;
+                self.pop_prefix(2);
             }
             _ => todo!("{expr:?}"),
         }

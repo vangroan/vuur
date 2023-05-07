@@ -26,6 +26,7 @@ const CASES: &[&str] = &[
     "x = 1 + 2",
     "z = x + y * 32",
     "one.two.three",
+    "one.two.three = x * y",
 ];
 
 #[test]
