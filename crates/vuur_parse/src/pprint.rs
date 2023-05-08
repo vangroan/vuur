@@ -93,13 +93,11 @@ impl<'a> PrettyExpr<'a> {
                 // lhs
                 self.fmt_prefix(f)?;
                 self.write_colour(f, "├─", color::FG_GREEN)?;
-                self.write_colour(f, "lhs: ", color::FG_YELLOW)?;
                 self.fmt_ident(f, &assign.lhs)?;
 
                 // rhs
                 self.fmt_prefix(f)?;
                 self.write_colour(f, "└─", color::FG_GREEN)?;
-                self.write_colour(f, "rhs: ", color::FG_YELLOW)?;
                 self.push_prefix("  ");
                 self.fmt_expr(f, &assign.rhs)?;
                 self.pop_prefix(2);
@@ -126,7 +124,6 @@ impl<'a> PrettyExpr<'a> {
                 // lhs
                 self.fmt_prefix(f)?;
                 self.write_colour(f, "├─", color::FG_GREEN)?;
-                self.write_colour(f, "lhs: ", color::FG_YELLOW)?;
                 self.push_prefix("│ ");
                 self.fmt_member_path(f, &assign.path)?;
                 self.pop_prefix(2);
@@ -138,7 +135,6 @@ impl<'a> PrettyExpr<'a> {
                 // rhs
                 self.fmt_prefix(f)?;
                 self.write_colour(f, "└─", color::FG_GREEN)?;
-                self.write_colour(f, "rhs: ", color::FG_YELLOW)?;
                 self.push_prefix("  ");
                 self.fmt_expr(f, &assign.rhs)?;
                 self.pop_prefix(2);
