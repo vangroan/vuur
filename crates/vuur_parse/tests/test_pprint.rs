@@ -3,7 +3,7 @@ use vuur_parse::pprint::PrettyExpr;
 use vuur_parse::stmt::{DefStmt, SimpleStmt};
 
 const FG_GREEN: &str = "\x1b[32m";
-const FG_WHITE: &str = "\x1b[37m";
+const FG_RESET: &str = "\x1b[0m";
 
 fn parse_expr(source_code: &str) -> Option<Expr> {
     let mut module = vuur_parse::parse_str(source_code).expect("parsing test module");
@@ -37,7 +37,7 @@ fn test_expr_pretty_print() {
     for case in CASES {
         let expr = parse_expr(case).unwrap();
         let pprint = PrettyExpr::new(&expr);
-        println!("{FG_GREEN}{case}{FG_WHITE}");
+        println!("{FG_GREEN}{case}{FG_RESET}");
         println!("{pprint}");
     }
 }

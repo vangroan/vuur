@@ -16,6 +16,7 @@ mod color {
     pub(super) const FG_MAGENTA: &str = "\x1b[35m";
     pub(super) const FG_CYAN:    &str = "\x1b[36m";
     pub(super) const FG_WHITE:   &str = "\x1b[37m";
+    pub(super) const FG_RESET:   &str = "\x1b[0m";
 }
 
 pub struct PrettyExpr<'a> {
@@ -44,12 +45,12 @@ impl<'a> PrettyExpr<'a> {
 
     fn fmt_prefix(&self, f: &mut Formatter) -> std::fmt::Result {
         use color::*;
-        write!(f, "{FG_GREEN}{}{FG_WHITE}", self.depth.borrow())
+        write!(f, "{FG_GREEN}{}{FG_RESET}", self.depth.borrow())
     }
 
     fn write_colour(&self, f: &mut Formatter, text: &str, color: &str) -> std::fmt::Result {
         use color::*;
-        write!(f, "{color}{text}{FG_WHITE}")
+        write!(f, "{color}{text}{FG_RESET}")
     }
 
     fn fmt_expr(&self, f: &mut Formatter, expr: &Expr) -> std::fmt::Result {
@@ -102,7 +103,7 @@ impl<'a> PrettyExpr<'a> {
                 self.fmt_expr(f, &assign.rhs)?;
                 self.pop_prefix(2);
             }
-            Expr::Num(num) => writeln!(f, "number {FG_MAGENTA}\"{}\"{FG_WHITE}", num.value)?,
+            Expr::Num(num) => writeln!(f, "number {FG_MAGENTA}\"{}\"{FG_RESET}", num.value)?,
             Expr::Group(group) => {
                 writeln!(f, "group")?;
 
@@ -113,7 +114,7 @@ impl<'a> PrettyExpr<'a> {
                 self.pop_prefix(2);
             }
             Expr::NameAccess(access) => {
-                writeln!(f, "name_access {FG_MAGENTA}\"{}\"{FG_WHITE}", access.ident.text)?;
+                writeln!(f, "name_access {FG_MAGENTA}\"{}\"{FG_RESET}", access.ident.text)?;
             }
             Expr::MemberAccess(access) => {
                 self.fmt_member_access(f, access)?;
@@ -152,7 +153,7 @@ impl<'a> PrettyExpr<'a> {
                 // arguments
                 self.fmt_prefix(f)?;
                 self.write_colour(f, "└─", color::FG_GREEN)?;
-                writeln!(f, "args {FG_BLUE}{}{FG_WHITE}", call.args.len())?;
+                writeln!(f, "args {FG_BLUE}{}{FG_RESET}", call.args.len())?;
 
                 self.push_prefix("  ");
                 for (index, arg) in call.args.iter().enumerate() {
@@ -188,7 +189,7 @@ impl<'a> PrettyExpr<'a> {
 
     fn fmt_ident(&self, f: &mut Formatter, ident: &Ident) -> std::fmt::Result {
         use color::*;
-        writeln!(f, "ident {FG_MAGENTA}\"{}\"{FG_WHITE}", ident.text)
+        writeln!(f, "ident {FG_MAGENTA}\"{}\"{FG_RESET}", ident.text)
     }
 
     fn fmt_member_access(&self, f: &mut Formatter, access: &MemberAccess) -> std::fmt::Result {
