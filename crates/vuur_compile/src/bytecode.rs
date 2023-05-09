@@ -26,7 +26,7 @@ pub mod opcodes {
 
     pub const PUSH_CONST:     OpCode = 0x10;
     pub const PUSH_CONST_IMM: OpCode = 0x11;
-    pub const PUSH_LOCAL_I32:     OpCode = 0x12;
+    pub const PUSH_LOCAL_I32: OpCode = 0x12;
 
     // ------------------------------------------------------------------------
     // Callables
