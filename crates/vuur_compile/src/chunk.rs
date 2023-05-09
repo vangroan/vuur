@@ -3,9 +3,10 @@ use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
-use crate::func::FuncDef;
 use crate::constants::*;
 use crate::error::{CompileError, ErrorKind, Result};
+use crate::func::{FuncDef, FuncId};
+use crate::limits::*;
 
 // TODO: Serialise and deserialise chunk to binary file
 
@@ -27,7 +28,7 @@ impl Chunk {
     {
         Self {
             name: name.to_string(),
-            funcs: Vec::new(),
+            funcs: vec![Self::null_func_def()],
             data: Vec::new(),
             code,
             header: ChunkHeader::empty(),
@@ -37,10 +38,17 @@ impl Chunk {
     pub fn from_code(code: Vec<u32>) -> Self {
         Self {
             name: CHUNK_DEFAULT_NAME.to_owned(),
-            funcs: Vec::new(),
+            funcs: vec![Self::null_func_def()],
             data: Vec::new(),
             code,
             header: ChunkHeader::empty(),
+        }
+    }
+
+    fn null_func_def() -> FuncDef {
+        FuncDef {
+            id: None,
+            bytecode_span: (0, 0),
         }
     }
 
@@ -75,6 +83,15 @@ impl Chunk {
         }
 
         Ok(())
+    }
+
+    /// Adds a function definition to the chunk's function table.
+    pub(crate) fn add_func(&mut self, mut func: FuncDef) -> FuncId {
+        assert!(self.funcs.len() < MAX_FUNCS, "maximum number of functions reached");
+        assert!(self.funcs.len() > 0, "function table must start at 1");
+        let next_id = FuncId::new(self.funcs.len() as u32);
+        self.funcs.push(func);
+        next_id.unwrap()
     }
 }
 

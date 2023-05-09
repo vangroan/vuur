@@ -23,7 +23,7 @@ where
     while ip < chunk.code.len() {
         let instruction = chunk.code[ip];
 
-        let byte_offset = CHUNK_HEADER_RESERVED + ip * std::mem::size_of::<u32>();
+        let byte_offset = ip * std::mem::size_of::<u32>();
         write!(f, "  ")?;
         write_instruction_hex(f, byte_offset, instruction)?;
         write!(f, "  ")?;
@@ -31,16 +31,25 @@ where
         let opcode = decode_opcode(instruction);
         match opcode {
             opcodes::NOOP => { /* skip */ }
-            opcodes::ADD_I32 => write!(f, ".add")?,
-            opcodes::SUB_I32 => write!(f, ".sub")?,
-            opcodes::MUL_I32 => write!(f, ".mul")?,
-            opcodes::DIV_I32 => write!(f, ".div")?,
-            opcodes::NEG_I32 => write!(f, ".neg")?,
-            opcodes::PUSH_CONST => write!(f, ".pushk\t{}", decode_arg_k(instruction))?,
-            opcodes::PUSH_CONST_IMM => write!(f, ".pushi\t{}", decode_arg_a(instruction))?,
-            opcodes::FUNC => write!(f, ".function")?,
-            opcodes::RETURN => write!(f, ".return")?,
-            opcodes::ABORT => write!(f, ".abort")?,
+            opcodes::ADD_I32 => write!(f, "add,i32")?,
+            opcodes::SUB_I32 => write!(f, "sub.i32")?,
+            opcodes::MUL_I32 => write!(f, "mul.i32")?,
+            opcodes::DIV_I32 => write!(f, "div.i32")?,
+            opcodes::NEG_I32 => write!(f, "neg.i32")?,
+            opcodes::EQ_I32 => write!(f, "eq.i32")?,
+            opcodes::PUSH_CONST => write!(f, "pushk\t{}", decode_arg_k(instruction))?,
+            opcodes::PUSH_CONST_IMM => write!(f, "pushi\t{}", decode_arg_a(instruction))?,
+            opcodes::PUSH_LOCAL_I32 => write!(f, "local.i32\t{}", decode_arg_k(instruction))?,
+            opcodes::FUNC => write!(f, "function")?,
+            opcodes::SKIP_ONE => write!(f, "skip_one.i32\t{}", decode_arg_k(instruction))?,
+            opcodes::CALL => write!(f, "call\t{}", decode_arg_k(instruction))?,
+            opcodes::RETURN => write!(f, "return")?,
+            opcodes::JUMP => write!(
+                f,
+                "jump\t0x{:X}",
+                decode_arg_k(instruction) * std::mem::size_of::<u32>() as u32
+            )?,
+            opcodes::ABORT => write!(f, "abort")?,
             _ => write!(f, "UNKNOWN")?,
         }
 

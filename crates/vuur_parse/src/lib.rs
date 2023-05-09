@@ -6,7 +6,7 @@ use vuur_lexer::span::BytePos;
 use vuur_lexer::Lexer;
 
 mod block;
-mod cond;
+pub mod cond;
 pub mod delim;
 pub mod error;
 pub mod expr;
