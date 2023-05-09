@@ -3,6 +3,7 @@ use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
+use crate::func::FuncDef;
 use crate::constants::*;
 use crate::error::{CompileError, ErrorKind, Result};
 
@@ -12,11 +13,11 @@ use crate::error::{CompileError, ErrorKind, Result};
 pub struct Chunk {
     /// Bytecode
     pub(crate) code: Vec<u32>,
+    pub(crate) funcs: Vec<FuncDef>,
+    pub(crate) data: Vec<Box<[u8]>>,
     /// Name of file where the original source was loaded.
     pub(crate) name: String,
     pub(crate) header: ChunkHeader,
-    // _padding: [u8; 8],
-    // ---- 64 byte cache line -----
 }
 
 impl Chunk {
@@ -26,6 +27,8 @@ impl Chunk {
     {
         Self {
             name: name.to_string(),
+            funcs: Vec::new(),
+            data: Vec::new(),
             code,
             header: ChunkHeader::empty(),
         }
@@ -34,6 +37,8 @@ impl Chunk {
     pub fn from_code(code: Vec<u32>) -> Self {
         Self {
             name: CHUNK_DEFAULT_NAME.to_owned(),
+            funcs: Vec::new(),
+            data: Vec::new(),
             code,
             header: ChunkHeader::empty(),
         }

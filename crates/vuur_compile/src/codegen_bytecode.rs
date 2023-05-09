@@ -4,7 +4,6 @@ use vuur_parse::stmt::{DefStmt, SimpleStmt};
 
 use crate::bytecode::{encode_u64, opcodes, WriteBytecode};
 use crate::chunk::{Chunk, ChunkHeader};
-use crate::codegen::Codegen;
 use crate::constants::*;
 use crate::error::{CompileError, ErrorKind, Result};
 use crate::limits::*;
@@ -142,6 +141,12 @@ impl BytecodeCodegen {
             funcs: Vec::with_capacity(64),
             _lines: Vec::new(),
         }
+    }
+
+    pub fn compile(&mut self, module: &VuurModule) -> Result<Chunk> {
+        self.compile_module(module)?;
+
+        Ok(self.take())
     }
 
     fn take(&mut self) -> Chunk {
@@ -313,16 +318,5 @@ impl BytecodeCodegen {
     fn compile_return(&mut self) -> Result<()> {
         self.top_frame_mut().bytecode.write_simple(opcodes::RETURN)?;
         Ok(())
-    }
-}
-
-impl Codegen for BytecodeCodegen {
-    type Input = VuurModule;
-    type Output = Chunk;
-
-    fn compile(&mut self, module: &Self::Input) -> Result<Self::Output> {
-        self.compile_module(module)?;
-
-        Ok(self.take())
     }
 }
