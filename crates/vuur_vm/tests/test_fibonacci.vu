@@ -15,3 +15,7 @@ func Fib(n: int) -> int {
         return 1
     }
 }
+
+func Nop() {
+    return
+}

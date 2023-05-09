@@ -48,7 +48,8 @@ impl Chunk {
     fn null_func_def() -> FuncDef {
         FuncDef {
             id: None,
-            bytecode_span: (0, 0),
+            // Point bytecode to end of chunk to avoid conflicts with real functions.
+            bytecode_span: (std::u32::MAX, std::u32::MAX),
         }
     }
 
@@ -90,6 +91,7 @@ impl Chunk {
         assert!(self.funcs.len() < MAX_FUNCS, "maximum number of functions reached");
         assert!(self.funcs.len() > 0, "function table must start at 1");
         let next_id = FuncId::new(self.funcs.len() as u32);
+        func.id = next_id;
         self.funcs.push(func);
         next_id.unwrap()
     }

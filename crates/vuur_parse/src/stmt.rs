@@ -16,7 +16,8 @@ use crate::{syntax_err, Parse, ParseResult};
 #[derive(Debug)]
 pub enum DefStmt {
     Func(FuncDef),
-    Return(Expr),
+    Return,
+    Return1(Expr),
     Type(),
     Simple(SimpleStmt),
 }
@@ -83,9 +84,16 @@ impl Parse for SimpleStmt {
 
 impl DefStmt {
     fn parse_return_stmt(input: &mut TokenStream) -> ParseResult<DefStmt> {
+        use TokenKind as TK;
+
         input.ignore_many(TokenKind::Whitespace);
         input.consume(TokenKind::Keyword(Keyword::Return))?;
-        Expr::parse(input).map(DefStmt::Return)
+        input.ignore_many(TokenKind::Whitespace);
+
+        match input.peek_kind() {
+            None | Some(TK::EOF | TK::Newline) => Ok(DefStmt::Return),
+            _ => Expr::parse(input).map(DefStmt::Return1),
+        }
     }
 
     pub fn simple(&self) -> Option<&SimpleStmt> {

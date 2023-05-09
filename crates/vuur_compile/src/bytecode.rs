@@ -32,9 +32,10 @@ pub mod opcodes {
     // Callables
     pub const FUNC: OpCode = 0x20;
 
-    pub const SKIP_ONE: OpCode = 0x30;
+    pub const SKIP_1:  OpCode = 0x30;
     pub const SKIP_LT: OpCode = 0x31;
     pub const SKIP_LE: OpCode = 0x32;
+    pub const SKIP_EQ_I32: OpCode = 0x32;
 
     // ------------------------------------------------------------------------
     // Control Flow
@@ -52,6 +53,7 @@ pub(crate) trait WriteBytecode {
     fn write_k(&mut self, op: OpCode, k: u32) -> io::Result<u32>;
     fn write_a(&mut self, op: OpCode, a: i32) -> io::Result<()>;
 
+    fn patch_simple(&mut self, addr: u32, op: OpCode) -> io::Result<()>;
     fn patch_k(&mut self, addr: u32, op: OpCode, k: u32) -> io::Result<()>;
 }
 
@@ -79,6 +81,11 @@ impl WriteBytecode for Vec<u32> {
     #[inline]
     fn write_a(&mut self, op: OpCode, a: i32) -> io::Result<()> {
         self.push(encode_a(op, a));
+        Ok(())
+    }
+
+    fn patch_simple(&mut self, addr: u32, op: OpCode) -> io::Result<()> {
+        self[addr as usize] = u32::from_le_bytes([op, 0, 0, 0]);
         Ok(())
     }
 

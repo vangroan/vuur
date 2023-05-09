@@ -3,7 +3,7 @@ use vuur_parse::expr::{Expr, OperatorKind};
 use vuur_parse::module::VuurModule;
 use vuur_parse::stmt::{DefStmt, SimpleStmt};
 
-use crate::bytecode::{encode_u64, opcodes, WriteBytecode};
+use crate::bytecode::{decode_opcode, encode_u64, opcodes, WriteBytecode};
 use crate::chunk::{Chunk, ChunkHeader};
 use crate::constants::*;
 use crate::error::{CompileError, ErrorKind, Result};
@@ -36,6 +36,15 @@ struct FuncEnv {
 impl FuncEnv {
     fn add_constant(&mut self, konst: ConstValue) -> usize {
         self.constants.add_constant(konst)
+    }
+
+    fn prev_addr(&self) -> u32 {
+        let len = self.bytecode.len() as u32;
+        if len == 0 {
+            0
+        } else {
+            len - 1
+        }
     }
 
     fn next_addr(&self) -> u32 {
@@ -212,20 +221,20 @@ impl BytecodeCodegen {
         match self.funcs.pop() {
             Some(func) => {
                 // Emit function def header
-                self.chunk.code_mut().write_simple(opcodes::FUNC)?;
+                // self.chunk.code_mut().write_simple(opcodes::FUNC)?;
 
                 // Write constants
-                self.chunk.code_mut().write_data(func.constants.len() as u32)?;
-                for konst in &func.constants.values {
-                    self.chunk.code_mut().write_data(konst.to_bits().unwrap_or_default())?;
-                }
+                // self.chunk.code_mut().write_data(func.constants.len() as u32)?;
+                // for konst in &func.constants.values {
+                //     self.chunk.code_mut().write_data(konst.to_bits().unwrap_or_default())?;
+                // }
 
                 // Write bytecode instructions
                 let span_start = self.chunk.code.len() as u32;
                 self.chunk.code.extend_from_slice(&func.bytecode);
                 let span_end = self.chunk.code.len() as u32;
 
-                let func_id = self.chunk.add_func(FuncDef {
+                let _func_id = self.chunk.add_func(FuncDef {
                     id: None,
                     bytecode_span: (span_start, span_end),
                 });
@@ -259,7 +268,10 @@ impl BytecodeCodegen {
                 DefStmt::Func(func) => {
                     self.compile_func_def(func)?;
                 }
-                DefStmt::Return(ret) => {
+                DefStmt::Return => {
+                    self.compile_return(None)?;
+                }
+                DefStmt::Return1(ret) => {
                     self.compile_return(Some(ret))?;
                 }
                 DefStmt::Simple(stmt) => {
@@ -303,8 +315,18 @@ impl BytecodeCodegen {
         let stub_addr = {
             let env = self.top_env_mut();
 
-            // Skip next instruction if boolean expression evaluates to true.
-            env.bytecode.write_simple(opcodes::SKIP_ONE)?;
+            // OPTI: Check the comparison instruction of the conditional
+            //       expression that was just compiled, and merge it into
+            //       a single cmp+skip instruction.
+            match env.bytecode.last().copied().map(decode_opcode) {
+                Some(opcodes::EQ_I32) => {
+                    env.bytecode.patch_simple(env.prev_addr(), opcodes::SKIP_EQ_I32)?;
+                }
+                Some(_) | None => {
+                    // Skip next instruction if boolean expression evaluates to true.
+                    env.bytecode.write_simple(opcodes::SKIP_1)?;
+                }
+            }
 
             // Stub to jump to false case.
             env.bytecode.write_simple(opcodes::NOOP)?
@@ -421,10 +443,17 @@ impl BytecodeCodegen {
     }
 
     fn compile_return(&mut self, expr: Option<&Expr>) -> Result<()> {
-        if let Some(expr) = expr {
-            self.compile_expr(expr)?;
+        match expr {
+            Some(expr) => {
+                // TODO: Support multiple return values
+                self.compile_expr(expr)?;
+                self.top_env_mut().bytecode.write_k(opcodes::RETURN, 1)?;
+            }
+            None => {
+                self.top_env_mut().bytecode.write_k(opcodes::RETURN, 0)?;
+            }
         }
-        self.top_env_mut().bytecode.write_simple(opcodes::RETURN)?;
+
         Ok(())
     }
 }
