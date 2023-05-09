@@ -87,6 +87,13 @@ impl DefStmt {
         input.consume(TokenKind::Keyword(Keyword::Return))?;
         Expr::parse(input).map(DefStmt::Return)
     }
+
+    pub fn simple(&self) -> Option<&SimpleStmt> {
+        match self {
+            DefStmt::Simple(stmt) => Some(stmt),
+            _ => None,
+        }
+    }
 }
 
 impl SimpleStmt {
@@ -97,5 +104,12 @@ impl SimpleStmt {
         input.ignore_many(TokenKind::Newline);
 
         Ok(SimpleStmt::Expr(expr))
+    }
+
+    pub fn expr(&self) -> Option<&Expr> {
+        match self {
+            SimpleStmt::Expr(expr) => Some(expr),
+            _ => None,
+        }
     }
 }
