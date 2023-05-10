@@ -28,7 +28,7 @@ impl Chunk {
     {
         Self {
             name: name.to_string(),
-            funcs: vec![Self::null_func_def()],
+            funcs: vec![Self::stub_func_def()],
             data: Vec::new(),
             code,
             header: ChunkHeader::empty(),
@@ -38,14 +38,14 @@ impl Chunk {
     pub fn from_code(code: Vec<u32>) -> Self {
         Self {
             name: CHUNK_DEFAULT_NAME.to_owned(),
-            funcs: vec![Self::null_func_def()],
+            funcs: vec![Self::stub_func_def()],
             data: Vec::new(),
             code,
             header: ChunkHeader::empty(),
         }
     }
 
-    fn null_func_def() -> FuncDef {
+    fn stub_func_def() -> FuncDef {
         FuncDef {
             id: None,
             // Point bytecode to end of chunk to avoid conflicts with real functions.
@@ -86,6 +86,12 @@ impl Chunk {
         Ok(())
     }
 
+    pub(crate) fn replace_func_stub(&mut self, func: FuncDef) {
+        assert!(func.id.is_some(), "function definition must have an ID");
+        let index = func.id.unwrap().to_usize();
+        self.funcs[index] = func;
+    }
+
     /// Adds a function definition to the chunk's function table.
     pub(crate) fn add_func(&mut self, mut func: FuncDef) -> FuncId {
         assert!(self.funcs.len() < MAX_FUNCS, "maximum number of functions reached");
@@ -94,6 +100,11 @@ impl Chunk {
         func.id = next_id;
         self.funcs.push(func);
         next_id.unwrap()
+    }
+
+    /// Adds a stub function to the chunk to reserve a function ID.
+    pub(crate) fn add_func_stub(&mut self) -> FuncId {
+        self.add_func(Self::stub_func_def())
     }
 }
 

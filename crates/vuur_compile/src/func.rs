@@ -13,6 +13,10 @@ impl FuncId {
     pub fn to_usize(self) -> usize {
         self.0.get() as usize
     }
+
+    pub fn to_u32(self) -> u32 {
+        self.0.get() as u32
+    }
 }
 
 /// Function definition.
