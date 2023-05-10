@@ -1,5 +1,5 @@
 use vuur_parse::cond::{ElseStmt, IfStmt};
-use vuur_parse::expr::{Expr, OperatorKind};
+use vuur_parse::expr::{CallArg, Expr, OperatorKind};
 use vuur_parse::module::VuurModule;
 use vuur_parse::stmt::{DefStmt, SimpleStmt};
 
@@ -568,7 +568,15 @@ impl BytecodeCodegen {
                 self.top_env_mut().bytecode.write_k(opcodes::PUSH_LOCAL_I32, local_id.0)?;
             }
             Expr::Call(call) => {
-                // TODO: Caller must prepare arguments on stack
+                // Caller must prepare arguments on stack
+                for call_arg in &call.args {
+                    match call_arg {
+                        CallArg::Simple(expr) => self.compile_expr(expr)?,
+                        CallArg::Named { .. } => todo!("named call arg"),
+                        CallArg::Block(_) => todo!("block call arg"),
+                    }
+                }
+
                 // TODO: Lookup function by name
                 match &*call.callee {
                     // When the function name is explicitly stated as a string literal,
