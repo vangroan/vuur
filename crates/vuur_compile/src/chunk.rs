@@ -19,6 +19,7 @@ pub struct Chunk {
     /// Name of file where the original source was loaded.
     pub(crate) name: String,
     pub(crate) header: ChunkHeader,
+    pub(crate) entrypoint: Option<FuncId>,
 }
 
 impl Chunk {
@@ -32,6 +33,7 @@ impl Chunk {
             data: Vec::new(),
             code,
             header: ChunkHeader::empty(),
+            entrypoint: None,
         }
     }
 
@@ -42,7 +44,17 @@ impl Chunk {
             data: Vec::new(),
             code,
             header: ChunkHeader::empty(),
+            entrypoint: None,
         }
+    }
+
+    pub fn entrypoint(&self) -> Option<FuncId> {
+        self.entrypoint
+    }
+
+    #[inline]
+    pub fn func_by_id(&self, func_id: u32) -> Option<&FuncDef> {
+        self.funcs.get(func_id as usize)
     }
 
     fn stub_func_def() -> FuncDef {
@@ -50,6 +62,7 @@ impl Chunk {
             id: None,
             // Point bytecode to end of chunk to avoid conflicts with real functions.
             bytecode_span: (std::u32::MAX, std::u32::MAX),
+            arity: 0,
         }
     }
 

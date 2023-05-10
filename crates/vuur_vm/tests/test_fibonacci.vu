@@ -19,3 +19,8 @@ func Fib_Broken(n: int) -> int {
 func Nop() {
     return
 }
+
+func Main() {
+    Fib(3)
+    return
+}

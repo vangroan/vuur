@@ -6,4 +6,8 @@ fn test_vm_fibonacci() {
     let mut buf = String::new();
     vuur_compile::disassemble(&mut buf, &chunk).expect("disassemble fibonacci");
     println!("{buf}");
+
+    let mut vm = vuur_vm::VM::new();
+    let result = vm.run(&chunk);
+    println!("result: {result:?}");
 }

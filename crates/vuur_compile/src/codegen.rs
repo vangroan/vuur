@@ -11,6 +11,8 @@ use crate::func::FuncId;
 use crate::limits::*;
 use crate::FuncDef;
 
+pub const ENTRYPOINT_NAME: &str = "Main";
+
 // TODO: Replace String error with proper error type
 
 /// Function compilation environment.
@@ -41,6 +43,8 @@ struct FuncEnv {
     bytecode: Vec<u32>,
     /// Start and end bytecode addresses.
     bytecode_span: (u32, u32),
+    /// Number of arguments needed to call this function.
+    arity: u8,
 }
 
 impl FuncEnv {
@@ -77,6 +81,7 @@ impl Default for FuncEnv {
             funcs: Vec::new(),
             bytecode: Vec::new(),
             bytecode_span: (0, 0),
+            arity: 0,
         }
     }
 }
@@ -319,6 +324,7 @@ impl BytecodeCodegen {
                 self.chunk.replace_func_stub(FuncDef {
                     id: Some(func_id),
                     bytecode_span: (span_start, span_end),
+                    arity: func.arity,
                 });
 
                 Ok(func_id)
@@ -339,6 +345,13 @@ impl BytecodeCodegen {
 
         self.compile_body(&module.stmts)?;
         self.compile_return(None)?;
+
+        let entrypoint = self.resolve_func(ENTRYPOINT_NAME).map_err(|_| CompileError {
+            message: format!("failed to resolve module entrypoint '{ENTRYPOINT_NAME}'"),
+            kind: ErrorKind::Compiler,
+        })?;
+        assert!(entrypoint.is_local());
+        self.chunk.entrypoint = entrypoint.local();
 
         self.finish_func()?;
 
@@ -442,6 +455,8 @@ impl BytecodeCodegen {
         // Declare function arguments as local variables.
         // TODO: Function receiver
         let env = self.top_env_mut();
+        env.arity = func.args.pairs.len() as u8;
+
         for arg_pair in func.args.pairs.iter() {
             let arg = &arg_pair.item;
             env.locals.push(arg.name.text.to_string());

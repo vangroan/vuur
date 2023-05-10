@@ -24,4 +24,7 @@ pub struct FuncDef {
     pub id: Option<FuncId>,
     /// Start and end position of function's bytecode.
     pub bytecode_span: (u32, u32),
+    /// Number of operand stack slots required for this
+    /// function's arguments.
+    pub arity: u8,
 }
