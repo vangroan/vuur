@@ -48,6 +48,10 @@ impl FuncEnv {
         self.constants.add_constant(konst)
     }
 
+    fn resolve_local(&self, name: &str) -> Option<LocalId> {
+        self.locals.iter().position(|n| n == name).map(|idx| LocalId(idx as u32))
+    }
+
     fn prev_addr(&self) -> u32 {
         let len = self.bytecode.len() as u32;
         if len == 0 {
@@ -76,6 +80,11 @@ impl Default for FuncEnv {
         }
     }
 }
+
+/// ID of local variable, or function argument.
+#[derive(Debug, Clone, Copy)]
+#[repr(transparent)]
+struct LocalId(u32);
 
 struct ConstantTable {
     values: Vec<ConstValue>,
@@ -430,6 +439,14 @@ impl BytecodeCodegen {
         let func_id = symbol.local().unwrap();
         self.push_func(func_id);
 
+        // Declare function arguments as local variables.
+        // TODO: Function receiver
+        let env = self.top_env_mut();
+        for arg_pair in func.args.pairs.iter() {
+            let arg = &arg_pair.item;
+            env.locals.push(arg.name.text.to_string());
+        }
+
         self.compile_body(&func.body.stmts)?;
 
         // Add function declaration to its parent's scope.
@@ -540,11 +557,18 @@ impl BytecodeCodegen {
             Expr::Group(group) => {
                 self.compile_expr(&group.expr)?;
             }
-            Expr::NameAccess(_) => {
-                eprintln!("name access not implemented");
-                self.top_env_mut().bytecode.write_simple(opcodes::PUSH_LOCAL_I32)?;
+            Expr::NameAccess(access) => {
+                let local_id =
+                    self.top_env_mut()
+                        .resolve_local(access.ident.text.as_str())
+                        .ok_or_else(|| CompileError {
+                            message: format!("failed to resolve local variable: '{}'", access.ident.text),
+                            kind: ErrorKind::Compiler,
+                        })?;
+                self.top_env_mut().bytecode.write_k(opcodes::PUSH_LOCAL_I32, local_id.0)?;
             }
             Expr::Call(call) => {
+                // TODO: Caller must prepare arguments on stack
                 // TODO: Lookup function by name
                 match &*call.callee {
                     // When the function name is explicitly stated as a string literal,
