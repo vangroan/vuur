@@ -43,7 +43,7 @@ where
             opcodes::NEG_I32 => write!(f, "neg.i32")?,
             opcodes::EQ_I32 => write!(f, "eq.i32")?,
             opcodes::PUSH_CONST => write!(f, "pushk\t{}", decode_arg_k(instruction))?,
-            opcodes::PUSH_CONST_IMM => write!(f, "pushi\t{}", decode_arg_a(instruction))?,
+            opcodes::PUSH_CONST_IMM => write!(f, "push.i32.im\t{}", decode_arg_a(instruction))?,
             opcodes::PUSH_LOCAL_I32 => write!(f, "local.i32\t{}", decode_arg_k(instruction))?,
             opcodes::FUNC => write!(f, "function")?,
             opcodes::SKIP_1 => write!(f, "skip.i32.1")?,
