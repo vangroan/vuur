@@ -229,7 +229,7 @@ impl Fiber {
                 }
                 ops::PUSH_LOCAL_I32 => {
                     let local_id = decode_arg_k(instruction);
-                    println!("push.local.i32 {}", local_id);
+                    println!("local.i32 {}", local_id);
                     match self.calls.last() {
                         // Because the VM is stack based, the function's local variables
                         // are already on the operand stack.
@@ -338,6 +338,7 @@ impl Fiber {
                 // jump to function bytecode
                 self.ip = func.bytecode_span.0 as usize;
                 println!("call {} 0x{:X}", func_id, func.bytecode_span.0);
+                println!("  base:  {arg_start}");
                 println!("  args:  {:?}", &self.stack[arg_start..]);
                 println!("  stack: {:?}", self.stack);
             }

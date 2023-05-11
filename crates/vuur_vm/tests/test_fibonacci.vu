@@ -21,6 +21,5 @@ func Nop() {
 }
 
 func Main() {
-    Fib(3)
-    return
+    Fib(5)
 }

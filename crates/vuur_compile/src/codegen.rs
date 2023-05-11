@@ -464,6 +464,15 @@ impl BytecodeCodegen {
 
         self.compile_body(&func.body.stmts)?;
 
+        // TODO: Check return expr type against signature return type.
+        // Ensure the function always returns.
+        if let Some(instruction) = self.top_env_mut().bytecode.iter().last() {
+            let last_opcode = decode_opcode(*instruction);
+            if last_opcode != opcodes::RETURN {
+                self.top_env_mut().bytecode.write_simple(opcodes::RETURN)?;
+            }
+        }
+
         // Add function declaration to its parent's scope.
         let func_id = self.finish_func()?;
         self.top_env_mut().funcs.push((func.name.text.to_string(), func_id)); // parent
