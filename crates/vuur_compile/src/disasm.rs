@@ -36,6 +36,7 @@ where
         let opcode = decode_opcode(instruction);
         match opcode {
             opcodes::NOOP => { /* skip */ }
+            opcodes::POP => write!(f, "pop")?,
             opcodes::ADD_I32 => write!(f, "add.i32")?,
             opcodes::SUB_I32 => write!(f, "sub.i32")?,
             opcodes::MUL_I32 => write!(f, "mul.i32")?,

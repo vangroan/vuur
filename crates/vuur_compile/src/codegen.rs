@@ -395,7 +395,20 @@ impl BytecodeCodegen {
                     // FIXME: Remove comment when `force_multiline_blocks` is stabilised: https://github.com/rust-lang/rustfmt/issues/3374
                     match stmt {
                         SimpleStmt::If(stmt) => self.compile_if_stmt(stmt)?,
-                        SimpleStmt::Expr(expr) => self.compile_expr(expr)?,
+                        SimpleStmt::Expr(expr) => {
+                            self.compile_expr(expr)?;
+
+                            // All expressions leave one result on the stack.
+                            //
+                            // In the case of an expression statement, the result won't
+                            // be used. A statement is expected to leave the stack as it
+                            // found it.
+                            //
+                            // Don't litter.
+                            //
+                            // TODO: When expressions return type `void` then nothing will be left on the stack.
+                            self.top_env_mut().bytecode.write_simple(opcodes::POP)?;
+                        }
                         _ => todo!("{stmt:?}"),
                     }
                 }

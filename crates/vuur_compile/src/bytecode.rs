@@ -14,6 +14,7 @@ pub mod opcodes {
     use super::OpCode;
 
     pub const NOOP: OpCode = 0;
+    pub const POP: OpCode = 0x01;
 
     // ------------------------------------------------------------------------
     // Arithmetic
@@ -36,6 +37,7 @@ pub mod opcodes {
     pub const SKIP_LT: OpCode = 0x31;
     pub const SKIP_LE: OpCode = 0x32;
     pub const SKIP_EQ_I32: OpCode = 0x32;
+    pub const JUMP_FALSE: OpCode = 0x33; // conditional jump
 
     // ------------------------------------------------------------------------
     // Control Flow

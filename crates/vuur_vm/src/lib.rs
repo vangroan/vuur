@@ -165,6 +165,11 @@ impl Fiber {
                     println!("");
                     self.ip += 1
                 }
+                ops::POP => {
+                    println!("pop");
+                    self.stack.pop();
+                    self.ip += 1;
+                }
                 ops::ADD_I32 => {
                     println!("add.i32");
                     let b = self.stack.pop().unwrap_or_default() as i32;
