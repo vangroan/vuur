@@ -62,6 +62,7 @@ impl Chunk {
             id: None,
             // Point bytecode to end of chunk to avoid conflicts with real functions.
             bytecode_span: (std::u32::MAX, std::u32::MAX),
+            local_count: 0,
             arity: 0,
         }
     }

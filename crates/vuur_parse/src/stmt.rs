@@ -6,6 +6,7 @@ use crate::cond::IfStmt;
 use crate::expr::Expr;
 use crate::func::FuncDef;
 use crate::stream::TokenStream;
+use crate::var::VarDef;
 use crate::{syntax_err, Parse, ParseResult};
 
 /// Definition statement.
@@ -19,6 +20,7 @@ pub enum DefStmt {
     Return,
     Return1(Expr),
     Type(),
+    Var(VarDef),
     Simple(SimpleStmt),
 }
 
@@ -47,6 +49,7 @@ impl Parse for DefStmt {
                 match keyword {
                     K::Func => FuncDef::parse(input).map(DefStmt::Func),
                     K::Return => DefStmt::parse_return_stmt(input),
+                    K::Var => VarDef::parse(input).map(DefStmt::Var),
                     _ => SimpleStmt::parse(input).map(DefStmt::Simple),
                 }
             } else {

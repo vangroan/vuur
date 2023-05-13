@@ -52,6 +52,22 @@ impl FuncEnv {
         self.constants.add_constant(konst)
     }
 
+    /// Declare a new local variable in this scope.
+    // TODO: Local variable type information
+    fn insert_local(&mut self, name: &str) -> Result<LocalId> {
+        match self.resolve_local(name) {
+            Some(_) => Err(CompileError {
+                message: format!("local variable '{name}' already declared (shadowing not implemented yet)"),
+                kind: ErrorKind::Compiler,
+            }),
+            None => {
+                let local_id = LocalId(self.locals.len() as u32);
+                self.locals.push(name.to_string());
+                Ok(local_id)
+            }
+        }
+    }
+
     fn resolve_local(&self, name: &str) -> Option<LocalId> {
         self.locals.iter().position(|n| n == name).map(|idx| LocalId(idx as u32))
     }
@@ -90,6 +106,12 @@ impl Default for FuncEnv {
 #[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
 struct LocalId(u32);
+
+impl Into<u32> for LocalId {
+    fn into(self) -> u32 {
+        self.0
+    }
+}
 
 struct ConstantTable {
     values: Vec<ConstValue>,
@@ -321,9 +343,23 @@ impl BytecodeCodegen {
 
                 let func_id = func.id.expect("block must have function ID");
 
+                // Both function arguments and local variables are compiled
+                // into the local table.
+                //
+                // However when the function is called in the VM, the caller puts
+                // arguments on the stack. The VM then extends the stack to make
+                // the slots for the local variables.
+                //
+                // Thus the local count must omit the function arguments, otherwise
+                // the stack will be extended with superfluous slots for the arguments.
+                //
+                // This is calculated outside of the VM for performance.
+                let local_count = func.locals.len() - func.arity as usize;
+
                 self.chunk.replace_func_stub(FuncDef {
                     id: Some(func_id),
                     bytecode_span: (span_start, span_end),
+                    local_count,
                     arity: func.arity,
                 });
 
@@ -369,9 +405,12 @@ impl BytecodeCodegen {
         for stmt in stmts {
             match stmt {
                 DefStmt::Type() => {
-                    todo!("compile tpye declaration")
+                    todo!("compile type declaration")
                 }
                 DefStmt::Func(func) => self.compile_func_prototype(func)?,
+                DefStmt::Var(var_def) => {
+                    self.top_env_mut().insert_local(&var_def.name.text)?;
+                }
                 _ => { /* skip */ }
             }
         }
@@ -411,6 +450,26 @@ impl BytecodeCodegen {
                         }
                         _ => todo!("{stmt:?}"),
                     }
+                }
+                DefStmt::Var(var_def) => {
+                    // Local variables must have reserved stack positions
+                    // from the declaration pass.
+                    let local_id =
+                        self.top_env_mut()
+                            .resolve_local(&var_def.name.text)
+                            .ok_or_else(|| CompileError {
+                                message: format!("local variable '{}' is not defined", var_def.name.text),
+                                kind: ErrorKind::Compiler,
+                            })?;
+
+                    // Evaluating the expression will leave a result on the stack.
+                    // This result will have to be moved into the local variable's slot
+                    // so other instructions can find it.
+                    self.compile_expr(&var_def.rhs)?;
+
+                    // Store the value at the top of the stack into the
+                    // the stack slot belonging to the local variable.
+                    self.top_env_mut().bytecode.write_k(opcodes::STORE_LOCAL, local_id.into())?;
                 }
                 _ => todo!(),
             }

@@ -17,6 +17,7 @@ pub mod pprint;
 pub mod stmt;
 pub mod stream;
 mod ty;
+pub mod var;
 
 pub fn parse_str(source: &str) -> ParseResult<VuurModule> {
     let lexer = Lexer::from_source(source);

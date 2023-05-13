@@ -3,7 +3,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use vuur_compile::bytecode::{decode_arg_a, decode_arg_k, decode_opcode, opcodes as ops};
-use vuur_compile::constants::CHUNK_HEADER_RESERVED;
 use vuur_compile::Chunk;
 
 pub mod error;
@@ -235,12 +234,28 @@ impl Fiber {
                 ops::PUSH_LOCAL_I32 => {
                     let local_id = decode_arg_k(instruction);
                     println!("local.i32 {}", local_id);
+                    // FIXME: Top call frame should be infallible to avoid this failure case
                     match self.calls.last() {
                         // Because the VM is stack based, the function's local variables
                         // are already on the operand stack.
                         Some(frame) => {
                             let stack_offset = frame.base + local_id as usize;
                             self.stack.push(self.stack[stack_offset]);
+                            self.ip += 1;
+                        }
+                        None => {
+                            self.set_error("variable lookup but no frame on call stack");
+                        }
+                    }
+                }
+                ops::STORE_LOCAL => {
+                    let local_id = decode_arg_k(instruction);
+                    println!("store.local {local_id}");
+                    // FIXME: Top call frame should be infallible to avoid this failure case
+                    match self.calls.last() {
+                        Some(frame) => {
+                            let stack_offset = frame.base + local_id as usize;
+                            self.stack[stack_offset] = self.stack.pop().unwrap_or(0);
                             self.ip += 1;
                         }
                         None => {
@@ -328,9 +343,14 @@ impl Fiber {
         match chunk.func_by_id(func_id) {
             Some(func) => {
                 let mut arg_start = 0;
+                let mut local_start = 0;
                 match self.stack.len().checked_sub(func.arity as usize) {
                     Some(stack_base) => {
                         arg_start = stack_base;
+
+                        // Extend stack for the function's local variable slots.
+                        self.stack.resize(self.stack.len() + func.local_count, 0);
+
                         self.calls.push(FrameInfo {
                             base: stack_base,
                             // after this insrtuction
@@ -344,7 +364,7 @@ impl Fiber {
                 self.ip = func.bytecode_span.0 as usize;
                 println!("call {} 0x{:X}", func_id, func.bytecode_span.0);
                 println!("  base:  {arg_start}");
-                println!("  args:  {:?}", &self.stack[arg_start..]);
+                println!("  args:  {:?}", &self.stack[arg_start..arg_start + func.arity as usize]);
                 println!("  stack: {:?}", self.stack);
             }
             None => self.set_error("failed to find function for id {func_id}"),
