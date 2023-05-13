@@ -2,7 +2,12 @@ use vuur_lexer::{Keyword, Token, TokenKind};
 
 use crate::ident::Ident;
 use crate::stream::TokenStream;
-use crate::{syntax_err, Parse};
+use crate::{declare_id, syntax_err, Parse};
+
+declare_id!(
+    /// Type identifier, not to be confused with Rust's [`std::any::TypeId`].
+    pub struct TypeId
+);
 
 #[derive(Debug)]
 pub struct Type {
