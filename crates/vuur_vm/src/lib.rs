@@ -231,9 +231,9 @@ impl Fiber {
                     self.stack.push(konst as u32);
                     self.ip += 1;
                 }
-                ops::PUSH_LOCAL_I32 => {
+                ops::LOAD_LOCAL => {
                     let local_id = decode_arg_k(instruction);
-                    println!("local.i32 {}", local_id);
+                    println!("load.local {}", local_id);
                     // FIXME: Top call frame should be infallible to avoid this failure case
                     match self.calls.last() {
                         // Because the VM is stack based, the function's local variables

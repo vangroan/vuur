@@ -661,7 +661,7 @@ impl BytecodeCodegen {
                             message: format!("failed to resolve local variable: '{}'", access.ident.text),
                             kind: ErrorKind::Compiler,
                         })?;
-                self.top_env_mut().bytecode.write_k(opcodes::PUSH_LOCAL_I32, local_id.0)?;
+                self.top_env_mut().bytecode.write_k(opcodes::LOAD_LOCAL, local_id.0)?;
             }
             Expr::Call(call) => {
                 // Caller must prepare arguments on stack
