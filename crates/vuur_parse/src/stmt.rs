@@ -93,9 +93,42 @@ impl DefStmt {
         input.consume(TokenKind::Keyword(Keyword::Return))?;
         input.ignore_many(TokenKind::Whitespace);
 
-        match input.peek_kind() {
+        let return_stmt = match input.peek_kind() {
             None | Some(TK::EOF | TK::Newline) => Ok(DefStmt::Return),
             _ => Expr::parse(input).map(DefStmt::Return1),
+        };
+
+        // end-of-statement
+        input.ignore_many(TokenKind::Newline);
+
+        return_stmt
+    }
+
+    pub fn func(&self) -> Option<&FuncDef> {
+        match self {
+            DefStmt::Func(stmt) => Some(stmt),
+            _ => None,
+        }
+    }
+
+    pub fn func_mut(&mut self) -> Option<&mut FuncDef> {
+        match self {
+            DefStmt::Func(stmt) => Some(stmt),
+            _ => None,
+        }
+    }
+
+    pub fn return1(&self) -> Option<&Expr> {
+        match self {
+            DefStmt::Return1(expr) => Some(expr),
+            _ => None,
+        }
+    }
+
+    pub fn return1_mut(&mut self) -> Option<&mut Expr> {
+        match self {
+            DefStmt::Return1(expr) => Some(expr),
+            _ => None,
         }
     }
 

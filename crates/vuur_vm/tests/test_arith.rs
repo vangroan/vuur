@@ -1,9 +1,32 @@
 //! Tests for arithmetic correctness.
 use vuur_compile::bytecode::{encode_a, encode_simple, opcodes::*};
 use vuur_compile::Chunk;
+use vuur_parse::expr::Expr;
+use vuur_parse::func::FuncDef;
+use vuur_parse::module::VuurModule;
+use vuur_parse::stmt::{DefStmt, SimpleStmt};
+use vuur_parse::Parse;
 
 type PROGRAM<'a> = &'a [u32];
 type RESULT = Option<u32>;
+
+const TEST_PROGRAM: &str = r#"
+func Main() -> int {
+    return 0
+}
+"#;
+
+fn create_program(bytecode: &[u32]) -> Chunk {
+    let bytecode_expr = Expr::Bytecode(bytecode.iter().copied().collect());
+
+    let mut module = vuur_parse::parse_str(TEST_PROGRAM).expect("parsing test program");
+
+    // patch the value of the return with the raw bytecode
+    let return_expr = module.stmts[0].func_mut().unwrap().body.stmts[0].return1_mut().unwrap();
+    *return_expr = bytecode_expr;
+
+    vuur_compile::compile(&module).expect("failed to compile test program")
+}
 
 #[test]
 fn test_arithmetic() {
@@ -65,9 +88,14 @@ fn test_arithmetic() {
 
     for (index, (code, expected)) in cases.iter().cloned().enumerate() {
         let mut vm = vuur_vm::VM::new();
-        let chunk = Chunk::new(format!("case_{}", index), code.iter().cloned().collect());
-        println!("test arithmetic {}", chunk.name());
-        assert_eq!(vm.run(&chunk), expected);
+        // let chunk = Chunk::new(format!("case_{}", index), code.iter().cloned().collect());
+        let chunk = create_program(code);
+        println!("test arithmetic case-{index}");
+        assert_eq!(
+            vm.run(&chunk),
+            expected,
+            "unexpected result from arithmetic case-{index}"
+        );
     }
 }
 
@@ -86,8 +114,9 @@ fn test_arithmetic_error() {
 
     for (index, (code, expected)) in cases.iter().cloned().enumerate() {
         let mut vm = vuur_vm::VM::new();
-        let chunk = Chunk::new(format!("case_{}", index), code.iter().cloned().collect());
-        println!("test arithmetic {}", chunk.name());
+        // let chunk = Chunk::new(format!("case_{}", index), code.iter().cloned().collect());
+        let chunk = create_program(code);
+        println!("test arithmetic case-{index}");
         assert_eq!(vm.run(&chunk), expected);
         let fiber = vm.fiber();
         assert!(fiber.has_error());

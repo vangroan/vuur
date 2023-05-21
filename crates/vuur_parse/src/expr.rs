@@ -141,6 +141,8 @@ pub enum Expr {
     MemberAccess(MemberAccess),
     MemberAssign(MemberAssign),
     Call(Call),
+    /// Raw inlined bytecode.
+    Bytecode(Vec<u32>),
 }
 
 /// Arithmetic operator kind.

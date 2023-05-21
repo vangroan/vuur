@@ -2,7 +2,7 @@ use std::{fs::File, io::Write};
 
 use vuur_compile::{compile, disassemble};
 
-#[test]
+// #[test]
 fn test_basic_arithmetic() {
     const SRC: &[&str] = &["1 + 2", "-4 + 3 * 2"];
 

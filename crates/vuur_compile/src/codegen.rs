@@ -698,6 +698,10 @@ impl BytecodeCodegen {
                     }
                 }
             }
+            // Bytecode literal is emitted as is, without any checks.
+            Expr::Bytecode(bytecode) => {
+                self.top_env_mut().bytecode.extend(bytecode);
+            }
             _ => todo!("{expr:?}"),
         }
 

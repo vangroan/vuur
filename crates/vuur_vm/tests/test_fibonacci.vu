@@ -23,3 +23,7 @@ func Nop() {
 func Main() {
     Fib(5)
 }
+
+func Main2() -> int {
+    return 0
+}

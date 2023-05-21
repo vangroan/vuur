@@ -34,6 +34,7 @@ impl Parse for Block {
             }
         }
 
+        println!("Block::parse; statements end");
         input.ignore_many(T::Whitespace);
         input.consume(T::RightBrace)?;
         input.ignore_many(T::Whitespace);
@@ -41,7 +42,7 @@ impl Parse for Block {
         match input.peek().map(|t| t.kind) {
             Some(T::Keyword(_)) => {
                 // Block can be terminated with a keyword, for cases like `else`.
-                // Do not consume so net parser can be chosen.
+                // Do not consume so next parser can be chosen.
                 println!("Block::parse; end; keyword");
                 Ok(Block { stmts })
             }

@@ -1,0 +1,36 @@
+package cgmath
+
+import (
+    "math",
+)
+
+type Vec = struct {
+    x: float,
+    y: float,
+    z: float,
+}
+
+func (lhs: *Vec) +(rhs: *Vec) -> Vec {
+    return Vec {
+        x: lhs.x + rhs.x,
+        y: lhs.y + rhs.y,
+        z: lhs.z + rhs.z,
+    }
+}
+
+func (vec: *Vec) Magnitude() -> float {
+    return math.Sqrt(vec.x**2 + vec.y**2 + vec.z**2)
+}
+
+func (*Vec) MagnitudeSqr() -> float {
+    return self.x**2 + self.y**2 + self.z**2
+}
+
+func (vec: *Vec) Normalize() -> Vec {
+    var m = vec.Magnitude()
+    return Vec {
+        x: vec / m,
+        y: vec / m,
+        z: vec / m,
+    }
+}
