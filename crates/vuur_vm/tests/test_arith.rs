@@ -2,10 +2,6 @@
 use vuur_compile::bytecode::{encode_a, encode_simple, opcodes::*};
 use vuur_compile::Chunk;
 use vuur_parse::expr::Expr;
-use vuur_parse::func::FuncDef;
-use vuur_parse::module::VuurModule;
-use vuur_parse::stmt::{DefStmt, SimpleStmt};
-use vuur_parse::Parse;
 
 type PROGRAM<'a> = &'a [u32];
 type RESULT = Option<u32>;
