@@ -5,6 +5,8 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use crate::constants::*;
 use crate::error::{CompileError, ErrorKind, Result};
+use crate::func::{FuncDef, FuncId};
+use crate::limits::*;
 
 // TODO: Serialise and deserialise chunk to binary file
 
@@ -12,11 +14,12 @@ use crate::error::{CompileError, ErrorKind, Result};
 pub struct Chunk {
     /// Bytecode
     pub(crate) code: Vec<u32>,
+    pub(crate) funcs: Vec<FuncDef>,
+    pub(crate) data: Vec<Box<[u8]>>,
     /// Name of file where the original source was loaded.
     pub(crate) name: String,
     pub(crate) header: ChunkHeader,
-    // _padding: [u8; 8],
-    // ---- 64 byte cache line -----
+    pub(crate) entrypoint: Option<FuncId>,
 }
 
 impl Chunk {
@@ -26,16 +29,41 @@ impl Chunk {
     {
         Self {
             name: name.to_string(),
+            funcs: vec![Self::stub_func_def()],
+            data: Vec::new(),
             code,
             header: ChunkHeader::empty(),
+            entrypoint: None,
         }
     }
 
     pub fn from_code(code: Vec<u32>) -> Self {
         Self {
             name: CHUNK_DEFAULT_NAME.to_owned(),
+            funcs: vec![Self::stub_func_def()],
+            data: Vec::new(),
             code,
             header: ChunkHeader::empty(),
+            entrypoint: None,
+        }
+    }
+
+    pub fn entrypoint(&self) -> Option<FuncId> {
+        self.entrypoint
+    }
+
+    #[inline]
+    pub fn func_by_id(&self, func_id: u32) -> Option<&FuncDef> {
+        self.funcs.get(func_id as usize)
+    }
+
+    fn stub_func_def() -> FuncDef {
+        FuncDef {
+            id: None,
+            // Point bytecode to end of chunk to avoid conflicts with real functions.
+            bytecode_span: (std::u32::MAX, std::u32::MAX),
+            local_count: 0,
+            arity: 0,
         }
     }
 
@@ -70,6 +98,27 @@ impl Chunk {
         }
 
         Ok(())
+    }
+
+    pub(crate) fn replace_func_stub(&mut self, func: FuncDef) {
+        assert!(func.id.is_some(), "function definition must have an ID");
+        let index = func.id.unwrap().to_usize();
+        self.funcs[index] = func;
+    }
+
+    /// Adds a function definition to the chunk's function table.
+    pub(crate) fn add_func(&mut self, mut func: FuncDef) -> FuncId {
+        assert!(self.funcs.len() < MAX_FUNCS, "maximum number of functions reached");
+        assert!(self.funcs.len() > 0, "function table must start at 1");
+        let next_id = FuncId::new(self.funcs.len() as u32);
+        func.id = next_id;
+        self.funcs.push(func);
+        next_id.unwrap()
+    }
+
+    /// Adds a stub function to the chunk to reserve a function ID.
+    pub(crate) fn add_func_stub(&mut self) -> FuncId {
+        self.add_func(Self::stub_func_def())
     }
 }
 

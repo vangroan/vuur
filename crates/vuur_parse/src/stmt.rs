@@ -6,6 +6,7 @@ use crate::cond::IfStmt;
 use crate::expr::Expr;
 use crate::func::FuncDef;
 use crate::stream::TokenStream;
+use crate::var::VarDef;
 use crate::{syntax_err, Parse, ParseResult};
 
 /// Definition statement.
@@ -16,8 +17,10 @@ use crate::{syntax_err, Parse, ParseResult};
 #[derive(Debug)]
 pub enum DefStmt {
     Func(FuncDef),
-    Return(Expr),
+    Return,
+    Return1(Expr),
     Type(),
+    Var(VarDef),
     Simple(SimpleStmt),
 }
 
@@ -46,6 +49,7 @@ impl Parse for DefStmt {
                 match keyword {
                     K::Func => FuncDef::parse(input).map(DefStmt::Func),
                     K::Return => DefStmt::parse_return_stmt(input),
+                    K::Var => VarDef::parse(input).map(DefStmt::Var),
                     _ => SimpleStmt::parse(input).map(DefStmt::Simple),
                 }
             } else {
@@ -83,9 +87,49 @@ impl Parse for SimpleStmt {
 
 impl DefStmt {
     fn parse_return_stmt(input: &mut TokenStream) -> ParseResult<DefStmt> {
+        use TokenKind as TK;
+
         input.ignore_many(TokenKind::Whitespace);
         input.consume(TokenKind::Keyword(Keyword::Return))?;
-        Expr::parse(input).map(DefStmt::Return)
+        input.ignore_many(TokenKind::Whitespace);
+
+        let return_stmt = match input.peek_kind() {
+            None | Some(TK::EOF | TK::Newline) => Ok(DefStmt::Return),
+            _ => Expr::parse(input).map(DefStmt::Return1),
+        };
+
+        // end-of-statement
+        input.ignore_many(TokenKind::Newline);
+
+        return_stmt
+    }
+
+    pub fn func(&self) -> Option<&FuncDef> {
+        match self {
+            DefStmt::Func(stmt) => Some(stmt),
+            _ => None,
+        }
+    }
+
+    pub fn func_mut(&mut self) -> Option<&mut FuncDef> {
+        match self {
+            DefStmt::Func(stmt) => Some(stmt),
+            _ => None,
+        }
+    }
+
+    pub fn return1(&self) -> Option<&Expr> {
+        match self {
+            DefStmt::Return1(expr) => Some(expr),
+            _ => None,
+        }
+    }
+
+    pub fn return1_mut(&mut self) -> Option<&mut Expr> {
+        match self {
+            DefStmt::Return1(expr) => Some(expr),
+            _ => None,
+        }
     }
 
     pub fn simple(&self) -> Option<&SimpleStmt> {

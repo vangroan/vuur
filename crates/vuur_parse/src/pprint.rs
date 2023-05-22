@@ -170,6 +170,9 @@ impl<'a> PrettyExpr<'a> {
                 }
                 self.pop_prefix(2);
             }
+            Expr::Bytecode(_) => {
+                writeln!(f, "bytecode")?;
+            }
         }
 
         Ok(())

@@ -1,12 +1,13 @@
 [package]
 name = "vuur_vm"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 vuur_compile = { path = "../vuur_compile" }
+vuur_parse = { path = "../vuur_parse" }
 
 # Dynamic Objects
 bytemuck = "1.13"

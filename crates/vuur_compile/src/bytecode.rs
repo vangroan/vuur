@@ -14,6 +14,7 @@ pub mod opcodes {
     use super::OpCode;
 
     pub const NOOP: OpCode = 0;
+    pub const POP: OpCode = 0x01;
 
     // ------------------------------------------------------------------------
     // Arithmetic
@@ -26,23 +27,40 @@ pub mod opcodes {
 
     pub const PUSH_CONST:     OpCode = 0x10;
     pub const PUSH_CONST_IMM: OpCode = 0x11;
+    
+    // ------------------------------------------------------------------------
+    // Variables
+    pub const LOAD_LOCAL: OpCode = 0x14;
+    pub const STORE_LOCAL: OpCode = 0x15;
 
     // ------------------------------------------------------------------------
     // Callables
     pub const FUNC: OpCode = 0x20;
 
+    pub const SKIP_1:  OpCode = 0x30;
+    pub const SKIP_LT: OpCode = 0x31;
+    pub const SKIP_LE: OpCode = 0x32;
+    pub const SKIP_EQ_I32: OpCode = 0x32;
+    pub const JUMP_FALSE: OpCode = 0x33; // conditional jump
+
     // ------------------------------------------------------------------------
     // Control Flow
-    pub const RETURN: OpCode = 0x30;
-    pub const ABORT:  OpCode = 0xFF;
+    pub const CALL:     OpCode = 0x50; // static call
+    pub const DYN_CALL: OpCode = 0x51; // dynamic call
+    pub const RETURN:   OpCode = 0x52;
+    pub const JUMP:     OpCode = 0x53; // unconditional jump
+    pub const ABORT:    OpCode = 0xFF;
 }
 
 // TODO: Fix bytecode write and use without compiler
 pub(crate) trait WriteBytecode {
     fn write_data(&mut self, data: u32) -> io::Result<()>;
-    fn write_simple(&mut self, op: OpCode) -> io::Result<()>;
-    fn write_k(&mut self, op: OpCode, k: u32) -> io::Result<()>;
+    fn write_simple(&mut self, op: OpCode) -> io::Result<u32>;
+    fn write_k(&mut self, op: OpCode, k: u32) -> io::Result<u32>;
     fn write_a(&mut self, op: OpCode, a: i32) -> io::Result<()>;
+
+    fn patch_simple(&mut self, addr: u32, op: OpCode) -> io::Result<()>;
+    fn patch_k(&mut self, addr: u32, op: OpCode, k: u32) -> io::Result<()>;
 }
 
 impl WriteBytecode for Vec<u32> {
@@ -53,20 +71,32 @@ impl WriteBytecode for Vec<u32> {
     }
 
     #[inline]
-    fn write_simple(&mut self, op: OpCode) -> io::Result<()> {
+    fn write_simple(&mut self, op: OpCode) -> io::Result<u32> {
+        let addr = self.len() as u32;
         self.push(u32::from_le_bytes([op, 0, 0, 0]));
-        Ok(())
+        Ok(addr)
     }
 
     #[inline]
-    fn write_k(&mut self, op: OpCode, k: u32) -> io::Result<()> {
+    fn write_k(&mut self, op: OpCode, k: u32) -> io::Result<u32> {
+        let addr = self.len() as u32;
         self.push(encode_k(op, k));
-        Ok(())
+        Ok(addr)
     }
 
     #[inline]
     fn write_a(&mut self, op: OpCode, a: i32) -> io::Result<()> {
         self.push(encode_a(op, a));
+        Ok(())
+    }
+
+    fn patch_simple(&mut self, addr: u32, op: OpCode) -> io::Result<()> {
+        self[addr as usize] = u32::from_le_bytes([op, 0, 0, 0]);
+        Ok(())
+    }
+
+    fn patch_k(&mut self, addr: u32, op: OpCode, k: u32) -> io::Result<()> {
+        self[addr as usize] = encode_k(op, k);
         Ok(())
     }
 }

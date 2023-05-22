@@ -21,9 +21,14 @@ where
 
     let mut ip = 0;
     while ip < chunk.code.len() {
+        if let Some(func) = chunk.funcs.iter().find(|f| f.bytecode_span.0 == ip as u32) {
+            let func_id = func.id.map(|id| id.to_usize()).unwrap_or(0);
+            writeln!(f, "\nfunc \"...\" {func_id}:")?;
+        }
+
         let instruction = chunk.code[ip];
 
-        let byte_offset = CHUNK_HEADER_RESERVED + ip * std::mem::size_of::<u32>();
+        let byte_offset = ip * std::mem::size_of::<u32>();
         write!(f, "  ")?;
         write_instruction_hex(f, byte_offset, instruction)?;
         write!(f, "  ")?;
@@ -31,16 +36,28 @@ where
         let opcode = decode_opcode(instruction);
         match opcode {
             opcodes::NOOP => { /* skip */ }
-            opcodes::ADD_I32 => write!(f, ".add")?,
-            opcodes::SUB_I32 => write!(f, ".sub")?,
-            opcodes::MUL_I32 => write!(f, ".mul")?,
-            opcodes::DIV_I32 => write!(f, ".div")?,
-            opcodes::NEG_I32 => write!(f, ".neg")?,
-            opcodes::PUSH_CONST => write!(f, ".pushk\t{}", decode_arg_k(instruction))?,
-            opcodes::PUSH_CONST_IMM => write!(f, ".pushi\t{}", decode_arg_a(instruction))?,
-            opcodes::FUNC => write!(f, ".function")?,
-            opcodes::RETURN => write!(f, ".return")?,
-            opcodes::ABORT => write!(f, ".abort")?,
+            opcodes::POP => write!(f, "pop")?,
+            opcodes::ADD_I32 => write!(f, "add.i32")?,
+            opcodes::SUB_I32 => write!(f, "sub.i32")?,
+            opcodes::MUL_I32 => write!(f, "mul.i32")?,
+            opcodes::DIV_I32 => write!(f, "div.i32")?,
+            opcodes::NEG_I32 => write!(f, "neg.i32")?,
+            opcodes::EQ_I32 => write!(f, "eq.i32")?,
+            opcodes::PUSH_CONST => write!(f, "pushk\t{}", decode_arg_k(instruction))?,
+            opcodes::PUSH_CONST_IMM => write!(f, "push.i32.im\t{}", decode_arg_a(instruction))?,
+            opcodes::LOAD_LOCAL => write!(f, "load.local\t{}", decode_arg_k(instruction))?,
+            opcodes::STORE_LOCAL => write!(f, "store.local\t{}", decode_arg_k(instruction))?,
+            opcodes::FUNC => write!(f, "function")?,
+            opcodes::SKIP_1 => write!(f, "skip.i32.1")?,
+            opcodes::SKIP_EQ_I32 => write!(f, "skip.eq.i32")?,
+            opcodes::CALL => write!(f, "call \t{}", decode_arg_k(instruction))?,
+            opcodes::RETURN => write!(f, "return\t{}", decode_arg_k(instruction))?,
+            opcodes::JUMP => write!(
+                f,
+                "jump\t0x{:X}",
+                decode_arg_k(instruction) * std::mem::size_of::<u32>() as u32
+            )?,
+            opcodes::ABORT => write!(f, "abort")?,
             _ => write!(f, "UNKNOWN")?,
         }
 

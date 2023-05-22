@@ -1,0 +1,29 @@
+
+func Fib(n: int) -> int {
+    if n == 0 {
+        return 0
+    } else if n == 1 {
+        return 1
+    }
+    return Fib(n - 1) + Fib(n - 2)
+}
+
+func Fib_Broken(n: int) -> int {
+    if n == 0 {
+        return 0
+    } else {
+        return 1
+    }
+}
+
+func Nop() {
+    return
+}
+
+func Main() {
+    Fib(5)
+}
+
+func Main2() -> int {
+    return 0
+}

@@ -3,7 +3,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use vuur_compile::bytecode::{decode_arg_a, decode_arg_k, decode_opcode, opcodes as ops};
-use vuur_compile::constants::CHUNK_HEADER_RESERVED;
 use vuur_compile::Chunk;
 
 pub mod error;
@@ -36,6 +35,9 @@ pub struct Fiber {
 
 #[derive(Debug)]
 struct FrameInfo {
+    /// Offset in the stack where this call frame's
+    /// local stack starts.
+    base: usize,
     /// Byte offset in chunk to return to when
     /// this stack frame is popped.
     return_addr: usize,
@@ -44,7 +46,10 @@ struct FrameInfo {
 impl Default for FrameInfo {
     #[inline]
     fn default() -> Self {
-        Self { return_addr: 0 }
+        Self {
+            base: 0,
+            return_addr: 0,
+        }
     }
 }
 
@@ -63,9 +68,13 @@ impl VM {
 
     // TODO: Return value from finished fiber
     pub fn run(&mut self, chunk: &Chunk) -> Option<u32> {
+        let entrypoint_id = chunk.entrypoint().unwrap();
+        let entrypoint = chunk.func_by_id(entrypoint_id.to_u32());
+        let entrypoint_addr = entrypoint.map(|f| f.bytecode_span.0).unwrap_or(0) as usize;
+
         match (*self.fiber).try_borrow_mut() {
             Ok(mut fiber) => {
-                fiber.ip = 0;
+                fiber.ip = entrypoint_addr;
                 fiber.run(chunk);
                 if let Some(error) = &fiber.error {
                     println!("runtime error: {}", error);
@@ -106,6 +115,7 @@ impl Fiber {
             stack: Vec::with_capacity(1024),
             // FIXME: For now the top level module function directs the interpreter to the starting byte to abort.
             calls: vec![FrameInfo {
+                base: 0,
                 return_addr: END_OF_CHUNK,
             }],
             done: false,
@@ -126,6 +136,7 @@ impl Fiber {
     }
 
     pub fn run(&mut self, chunk: &Chunk) {
+        println!("running...");
         'eval: loop {
             if self.ip >= chunk.code().len() {
                 println!("end-of-chunk");
@@ -153,16 +164,22 @@ impl Fiber {
                     println!("");
                     self.ip += 1
                 }
+                ops::POP => {
+                    println!("pop");
+                    self.stack.pop();
+                    self.ip += 1;
+                }
                 ops::ADD_I32 => {
-                    println!(".add");
+                    println!("add.i32");
                     let b = self.stack.pop().unwrap_or_default() as i32;
                     let a = self.stack.pop().unwrap_or_default() as i32;
                     let c = a.wrapping_add(b);
                     self.stack.push(c as u32);
-                    self.ip += 1
+                    self.ip += 1;
+                    println!("  stack: {:?}", self.stack);
                 }
                 ops::SUB_I32 => {
-                    println!(".sub");
+                    println!("sub.i32");
                     let b = self.stack.pop().unwrap_or_default() as i32;
                     let a = self.stack.pop().unwrap_or_default() as i32;
                     let c = a.wrapping_sub(b);
@@ -170,7 +187,7 @@ impl Fiber {
                     self.ip += 1
                 }
                 ops::MUL_I32 => {
-                    println!(".mul");
+                    println!("mul.i32");
                     let b = self.stack.pop().unwrap_or_default() as i32;
                     let a = self.stack.pop().unwrap_or_default() as i32;
                     let c = a.wrapping_mul(b);
@@ -178,7 +195,7 @@ impl Fiber {
                     self.ip += 1
                 }
                 ops::DIV_I32 => {
-                    println!(".div");
+                    println!("div.i32");
                     let b = self.stack.pop().unwrap_or_default() as i32;
                     let a = self.stack.pop().unwrap_or_default() as i32;
                     match a.checked_div(b) {
@@ -190,9 +207,16 @@ impl Fiber {
                     }
                 }
                 ops::NEG_I32 => {
-                    println!(".neg");
+                    println!("neg.i32");
                     let b = self.stack.pop().unwrap_or_default() as i32;
                     self.stack.push(-b as u32);
+                    self.ip += 1;
+                }
+                ops::EQ_I32 => {
+                    println!("eq.i32");
+                    let b = self.stack.pop().unwrap_or_default() as i32;
+                    let a = self.stack.pop().unwrap_or_default() as i32;
+                    self.stack.push(if a == b { 1 } else { 0 });
                     self.ip += 1;
                 }
                 ops::PUSH_CONST => {
@@ -203,18 +227,88 @@ impl Fiber {
                 }
                 ops::PUSH_CONST_IMM => {
                     let konst = decode_arg_a(instruction);
-                    println!(".pushi {}", konst);
+                    println!("push.i32.im {}", konst);
                     self.stack.push(konst as u32);
                     self.ip += 1;
+                }
+                ops::LOAD_LOCAL => {
+                    let local_id = decode_arg_k(instruction);
+                    println!("load.local {}", local_id);
+                    // FIXME: Top call frame should be infallible to avoid this failure case
+                    match self.calls.last() {
+                        // Because the VM is stack based, the function's local variables
+                        // are already on the operand stack.
+                        Some(frame) => {
+                            let stack_offset = frame.base + local_id as usize;
+                            self.stack.push(self.stack[stack_offset]);
+                            self.ip += 1;
+                        }
+                        None => {
+                            self.set_error("variable lookup but no frame on call stack");
+                        }
+                    }
+                }
+                ops::STORE_LOCAL => {
+                    let local_id = decode_arg_k(instruction);
+                    println!("store.local {local_id}");
+                    // FIXME: Top call frame should be infallible to avoid this failure case
+                    match self.calls.last() {
+                        Some(frame) => {
+                            let stack_offset = frame.base + local_id as usize;
+                            self.stack[stack_offset] = self.stack.pop().unwrap_or(0);
+                            self.ip += 1;
+                        }
+                        None => {
+                            self.set_error("variable lookup but no frame on call stack");
+                        }
+                    }
                 }
                 ops::FUNC => {
                     println!(".function");
                     self.ip += 2; // skip constant table
                 }
+                ops::SKIP_1 => {
+                    println!("skip.i32.1");
+                    let a = self.stack.pop().unwrap_or_default() as i32;
+                    if a == 1 {
+                        self.ip += 2
+                    } else {
+                        self.ip += 1
+                    }
+                }
+                ops::SKIP_EQ_I32 => {
+                    println!("skip.eq.i32");
+                    let b = self.stack.pop().unwrap_or_default() as i32;
+                    let a = self.stack.pop().unwrap_or_default() as i32;
+                    if a == b {
+                        self.ip += 2
+                    } else {
+                        self.ip += 1
+                    }
+                }
+                ops::CALL => {
+                    let func_id = decode_arg_k(instruction);
+                    println!("call {func_id}");
+                    self.call_func(chunk, func_id);
+                }
                 ops::RETURN => {
+                    let n = decode_arg_k(instruction);
+                    println!("return {n}");
                     match self.calls.pop() {
                         Some(frame) => {
-                            println!(".return to 0x{:06X}", frame.return_addr);
+                            // TODO: Multiple return values
+                            let result = self.stack.pop().unwrap_or_default();
+
+                            // Truncate the stack that belongs to the current function.
+                            self.stack.truncate(frame.base);
+
+                            // Put the result back onto the stack for the caller function.
+                            self.stack.push(result);
+
+                            println!("return to 0x{:06X}", frame.return_addr);
+                            println!("  base: {}", frame.base);
+                            println!("  result: {result}");
+                            println!("  stack: {:?}", self.stack);
                             self.ip = frame.return_addr;
                         }
                         None => {
@@ -225,12 +319,55 @@ impl Fiber {
                         }
                     }
                 }
+                ops::JUMP => {
+                    let addr = decode_arg_k(instruction);
+                    println!("jump 0x{:X}", addr * 4);
+                    self.ip = addr as usize;
+                }
+                ops::ABORT => {
+                    println!("abort");
+                    self.done = true;
+                    break 'eval;
+                }
                 _ => {
-                    println!(".abort");
+                    println!("abort");
                     self.done = true;
                     break 'eval;
                 }
             }
+        }
+    }
+
+    #[inline(always)]
+    fn call_func(&mut self, chunk: &Chunk, func_id: u32) {
+        match chunk.func_by_id(func_id) {
+            Some(func) => {
+                let mut arg_start = 0;
+                let mut local_start = 0;
+                match self.stack.len().checked_sub(func.arity as usize) {
+                    Some(stack_base) => {
+                        arg_start = stack_base;
+
+                        // Extend stack for the function's local variable slots.
+                        self.stack.resize(self.stack.len() + func.local_count, 0);
+
+                        self.calls.push(FrameInfo {
+                            base: stack_base,
+                            // after this insrtuction
+                            return_addr: self.ip + 1,
+                        });
+                    }
+                    None => self.set_error("stack underflow when attempting to set function call base"),
+                }
+
+                // jump to function bytecode
+                self.ip = func.bytecode_span.0 as usize;
+                println!("call {} 0x{:X}", func_id, func.bytecode_span.0);
+                println!("  base:  {arg_start}");
+                println!("  args:  {:?}", &self.stack[arg_start..arg_start + func.arity as usize]);
+                println!("  stack: {:?}", self.stack);
+            }
+            None => self.set_error("failed to find function for id {func_id}"),
         }
     }
 
@@ -260,6 +397,6 @@ impl Fiber {
     }
 
     fn print_ip(&self) {
-        print!("0x{:08X}  ", CHUNK_HEADER_RESERVED + self.ip);
+        print!("0x{:08X}  ", self.ip * 4);
     }
 }

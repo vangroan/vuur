@@ -60,6 +60,7 @@ pub enum Keyword {
     Return,    // block return statement
     Struct,    // struct type declaration
     Type,      // type declaration statement
+    Var,       // variable declaration statement
 }
 
 impl Token {
@@ -153,7 +154,7 @@ impl<'a> TryFrom<&'a str> for Keyword {
             // "super"      => Ok(K::Super),
             // "this"       => Ok(K::This),
             // "true"       => Ok(K::True),
-            // "var"        => Ok(K::Var),
+            "var"        => Ok(K::Var),
             // "while"      => Ok(K::While),
             _ => Err(()),
         }
@@ -187,7 +188,7 @@ impl std::fmt::Display for Keyword {
             // K::Super        => write!(f, "super"),
             // K::This         => write!(f, "this"),
             // K::True         => write!(f, "true"),
-            // K::Var          => write!(f, "var"),
+            K::Var          => write!(f, "var"),
             // K::While        => write!(f, "while"),
         }
     }
