@@ -6,7 +6,7 @@ use crate::span::Span;
 ///
 /// Tokens are the fundamental unit of source code produced by
 /// the [Lexer](struct.Lexer.html).
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Token {
     pub kind: TokenKind,
     pub span: Span,
@@ -21,6 +21,13 @@ impl Token {
     #[inline]
     pub fn fragment<'a>(&self, source: &'a str) -> &'a str {
         &source[self.span.to_range()]
+    }
+}
+
+impl std::fmt::Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self { kind, span } = self;
+        write!(f, "{kind} {span}")
     }
 }
 
@@ -73,6 +80,19 @@ pub enum TokenKind {
     EOF,
     /// Unknown character was encoutered in the source.
     Unknown,
+}
+
+impl TokenKind {
+    #[rustfmt::skip]
+    pub fn decode(lexeme: &str) -> Result<Self, DecodeError> {
+        match lexeme {
+            "left_paren"    => Ok(Self::LeftParen),
+            "right_paren"   => Ok(Self::RightParen),
+            "left_bracket"  => Ok(Self::LeftBracket),
+            "right_bracket" => Ok(Self::RightBracket),
+            _ => Err(DecodeError),
+        }
+    }
 }
 
 /// Formatting token kind to a human readable description
@@ -206,5 +226,67 @@ impl std::fmt::Display for Keyword {
         };
 
         std::fmt::Display::fmt(name, f)
+    }
+}
+
+/// Utility for decoding a [Token] and its [Span] from a line of text.
+///
+/// ```non-rust
+/// if         0 2
+/// number     3 1
+/// gt         5 1
+/// left-brace 7 1
+/// ```
+#[derive(Debug)]
+pub struct TokenDecoder;
+
+impl TokenDecoder {
+    pub fn decode(line: &str) -> Result<Token, DecodeError> {
+        let mut scanner = line.split_whitespace();
+
+        let token_kind = scanner.next().ok_or_else(|| DecodeError)?;
+        let start = scanner.next().ok_or_else(|| DecodeError)?;
+        let size = scanner.next().ok_or_else(|| DecodeError)?;
+
+        Ok(Token::new(
+            TokenKind::decode(token_kind)?,
+            Span::new(
+                u32::from_str_radix(start, 10).unwrap(),
+                u32::from_str_radix(size, 10).unwrap(),
+            ),
+        ))
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct DecodeError;
+
+impl std::fmt::Display for DecodeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "error decoding token")
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::TokenKind::*;
+    use super::*;
+
+    #[test]
+    fn test_token_decode() {
+        const CASES: &[(&str, Token)] = &[
+            ("left_paren    0  1", Token::new(LeftParen, Span::new(0, 1))),
+            ("right_paren   1  1", Token::new(RightParen, Span::new(1, 1))),
+            ("left_bracket  2  1", Token::new(LeftBracket, Span::new(2, 1))),
+            ("right_bracket 3  1", Token::new(RightBracket, Span::new(3, 1))),
+        ];
+
+        for (line, expected) in CASES {
+            assert_eq!(
+                TokenDecoder::decode(line),
+                Ok(expected.clone()),
+                "case: {line} -> {expected}"
+            );
+        }
     }
 }
