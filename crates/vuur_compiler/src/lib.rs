@@ -10,4 +10,6 @@ mod tokens;
 pub use self::{
     error::{CodeError, ErrorKind, Stage},
     span::Span,
+    tokens::lexer::Lexer,
+    tokens::tokens::{Token, TokenKind},
 };

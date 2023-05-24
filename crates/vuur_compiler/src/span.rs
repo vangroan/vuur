@@ -17,7 +17,7 @@ impl Span {
 }
 
 impl Span {
-    pub fn new(index: u32, size: u32) -> Self {
+    pub const fn new(index: u32, size: u32) -> Self {
         Self { index, size }
     }
 }
