@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Span {
     pub index: u32,
     pub size: u32,
@@ -32,6 +32,11 @@ impl std::fmt::Display for Span {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn test_assert_span_size() {
+        assert_eq!(std::mem::size_of::<Span>(), 8);
+    }
 
     #[test]
     fn test_span_range() {
