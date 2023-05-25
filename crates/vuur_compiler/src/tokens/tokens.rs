@@ -73,6 +73,7 @@ pub enum TokenKind {
     Comment,
 
     /// Spaces and tabs.
+    #[deprecated]
     Whitespace,
     /// Line-feed and optionally a carriage return
     Newline,
@@ -90,6 +91,39 @@ impl TokenKind {
             "right_paren"   => Ok(Self::RightParen),
             "left_bracket"  => Ok(Self::LeftBracket),
             "right_bracket" => Ok(Self::RightBracket),
+            "left_brace"    => Ok(Self::LeftBrace),
+            "right_brace"   => Ok(Self::RightBrace),
+            "dot"           => Ok(Self::Dot),
+            "dot_dot"       => Ok(Self::DotDot),
+            "ellipses"      => Ok(Self::Ellipses),
+            "add"           => Ok(Self::Add),
+            "sub"           => Ok(Self::Sub),
+            "mul"           => Ok(Self::Mul),
+            "div"           => Ok(Self::Div),
+            "star_star"     => Ok(Self::StarStar),
+            "eq"            => Ok(Self::Eq),
+            "eq_eq"         => Ok(Self::EqEq),
+            "not_eq"        => Ok(Self::NotEq),
+            "thin_arrow"    => Ok(Self::ThinArrow),
+            "ampersand"     => Ok(Self::Ampersand),
+            "comma"         => Ok(Self::Comma),
+            "colon"         => Ok(Self::Colon),
+            "semicolon"     => Ok(Self::Semicolon),
+            // ---
+            "identifier"    => Ok(Self::Ident),
+            "number"        => Ok(Self::Number),
+            "string"        => Ok(Self::String),
+            "interp_str"    => Ok(Self::Interpolated),
+            // ---
+            "comment_line"  => Ok(Self::CommentLine),
+            "comment_left"  => Ok(Self::CommentLeft),
+            "comment_right" => Ok(Self::CommentRight),
+            "comment"       => Ok(Self::Comment),
+            // ---
+            "newline"       => Ok(Self::Newline),
+            "eof"           => Ok(Self::EOF),
+            "unknown"       => Ok(Self::Unknown),
+
             _ => Err(DecodeError),
         }
     }
@@ -279,6 +313,39 @@ mod test {
             ("right_paren   1  1", Token::new(RightParen, Span::new(1, 1))),
             ("left_bracket  2  1", Token::new(LeftBracket, Span::new(2, 1))),
             ("right_bracket 3  1", Token::new(RightBracket, Span::new(3, 1))),
+            ("left_brace    4  1", Token::new(LeftBrace, Span::new(4, 1))),
+            ("right_brace   5  1", Token::new(RightBrace, Span::new(5, 1))),
+            ("dot           6  1", Token::new(Dot, Span::new(6, 1))),
+            ("dot_dot       7  1", Token::new(DotDot, Span::new(7, 1))),
+            ("dot_dot       8  1", Token::new(DotDot, Span::new(8, 1))),
+            ("ellipses      9  1", Token::new(Ellipses, Span::new(9, 1))),
+            ("add          10  1", Token::new(Add, Span::new(10, 1))),
+            ("sub          11  1", Token::new(Sub, Span::new(11, 1))),
+            ("mul          12  1", Token::new(Mul, Span::new(12, 1))),
+            ("div          13  1", Token::new(Div, Span::new(13, 1))),
+            ("star_star    14  1", Token::new(StarStar, Span::new(14, 1))),
+            ("eq           15  1", Token::new(Eq, Span::new(15, 1))),
+            ("eq_eq        16  1", Token::new(EqEq, Span::new(16, 1))),
+            ("not_eq       17  1", Token::new(NotEq, Span::new(17, 1))),
+            ("thin_arrow   18  1", Token::new(ThinArrow, Span::new(18, 1))),
+            ("ampersand    18  1", Token::new(Ampersand, Span::new(18, 1))),
+            ("comma        19  1", Token::new(Comma, Span::new(19, 1))),
+            ("colon        20  1", Token::new(Colon, Span::new(20, 1))),
+            ("semicolon    21  1", Token::new(Semicolon, Span::new(21, 1))),
+            // ---
+            ("identifier   22  1", Token::new(Ident, Span::new(22, 1))),
+            ("number       23  1", Token::new(Number, Span::new(23, 1))),
+            ("string       24  1", Token::new(String, Span::new(24, 1))),
+            ("interp_str   25  1", Token::new(Interpolated, Span::new(25, 1))),
+            // ---
+            ("comment_line   26  1", Token::new(CommentLine, Span::new(26, 1))),
+            ("comment_left   27  1", Token::new(CommentLeft, Span::new(27, 1))),
+            ("comment_right  28  1", Token::new(CommentRight, Span::new(28, 1))),
+            ("comment        29  1", Token::new(Comment, Span::new(29, 1))),
+            // ---
+            ("newline      30  1", Token::new(Newline, Span::new(30, 1))),
+            ("eof          31  1", Token::new(EOF, Span::new(31, 1))),
+            ("unknown      32  1", Token::new(Unknown, Span::new(32, 1))),
         ];
 
         for (line, expected) in CASES {

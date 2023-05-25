@@ -1,6 +1,6 @@
 //! Lexical analysis.
 
-/// Lexical analyser (tokeniser) for Vuur language.
+/// Lexical analyser (tokeniser) for the Vuur language.
 pub struct Lexer<'a> {
     /// Keep reference to the source so the parser can
     /// slice fragments from it.
