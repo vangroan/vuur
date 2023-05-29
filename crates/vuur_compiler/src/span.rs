@@ -1,5 +1,7 @@
 use std::ops::Range;
 
+use unicode_width::UnicodeWidthChar;
+
 /// A region of source code, stored as a position and size
 /// of the bytes insize a UTF-8 string.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -65,7 +67,7 @@ impl Span {
 
             if matches!(chr, '\n') {
                 line += 1;
-                column = 1;
+                column = UnicodeWidthChar::width(chr).unwrap_or(1) as u32;
             } else {
                 column += 1;
             }
