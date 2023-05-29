@@ -67,9 +67,9 @@ impl Span {
 
             if matches!(chr, '\n') {
                 line += 1;
-                column = UnicodeWidthChar::width(chr).unwrap_or(1) as u32;
+                column = 1;
             } else {
-                column += 1;
+                column += UnicodeWidthChar::width(chr).unwrap_or(1) as u32;
             }
         }
 
