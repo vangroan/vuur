@@ -1,11 +1,14 @@
 use std::ops::Range;
 
+/// A region of source code, stored as a position and size
+/// of the bytes insize a UTF-8 string.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Span {
     pub index: u32,
     pub size: u32,
 }
 
+// Span is size optimised for 64-bit machines.
 #[cfg(target_pointer_width = "64")]
 static_assertions::assert_eq_size!(Span, u64);
 
