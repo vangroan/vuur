@@ -37,7 +37,7 @@ impl Span {
         let Self { index, size } = self.clone();
         let start = index;
         let end = start + size;
-        assert!(text.len() >= end as usize, "text is longer than span end");
+        assert!(text.len() >= end as usize, "span end is outside of text");
 
         let mut line = 1;
         let mut column = 1;
