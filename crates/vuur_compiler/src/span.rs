@@ -108,7 +108,7 @@ mod test {
     #[test]
     fn test_span_range() {
         let text = "abcdefg";
-        //                ..^^^..
+        //          ..^^^..
         let span = Span::new(2, 3);
         let range = span.to_range();
         println!("span: {span}; range: {range:?}");
