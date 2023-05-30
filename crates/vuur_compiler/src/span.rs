@@ -33,33 +33,25 @@ impl Span {
     ///
     /// Panics if the span does not fit inside the given text.
     pub fn line_column(&self, text: &str) -> CodeSpan {
-        let mut line_span: (u32, u32) = (1, 1);
-        let mut column_span: (u32, u32) = (1, 1);
+        let mut line_span: (u32, u32) = (0, 0);
+        let mut column_span: (u32, u32) = (0, 0);
 
         let Self { index, size } = self.clone();
-        let start = index;
-        let end = start + size;
-        assert!(text.len() >= end as usize, "span end is outside of text");
+        let start = index as usize;
+        let end = start + size as usize;
+        assert!(text.len() >= end, "span end is outside of text");
 
         let mut line = 1;
         let mut column = 1;
 
-        for (index, chr) in text.char_indices() {
-            let index = index as u32;
-
+        for (index, chr) in text.char_indices().take(end) {
             if index == start {
-                // Inclusive
+                // Begin code span
                 line_span.0 = line;
                 column_span.0 = column;
-            } else if index == end {
-                // Exclusive size
-                line_span.1 = line + 1 - line_span.0;
-
-                // Convert end column to size.
-                column_span.1 = column_span.1 + 1 - column_span.0;
-
-                break;
             } else if index > start {
+                line_span.1 = line.max(line_span.1);
+
                 // Move column left in case span crosses line
                 column_span.0 = column.min(column_span.0);
                 column_span.1 = column.max(column_span.1); // end column, converted to size later
@@ -69,9 +61,16 @@ impl Span {
                 line += 1;
                 column = 1;
             } else {
-                column += UnicodeWidthChar::width(chr).unwrap_or(1) as u32;
+                let width = UnicodeWidthChar::width(chr).unwrap_or(0) as u32;
+                column += width;
             }
         }
+
+        // Convert end line position to y-size.
+        line_span.1 = line_span.1 + 1 - line_span.0;
+
+        // Convert end column position to x-size.
+        column_span.1 = column_span.1 + 1 - column_span.0;
 
         CodeSpan {
             line: line_span,
@@ -93,8 +92,11 @@ impl std::fmt::Display for Span {
     }
 }
 
+/// A region of code describing the start and size, by line and column.
 pub struct CodeSpan {
+    /// Line start and size
     pub line: (u32, u32),
+    /// Column start and size
     pub column: (u32, u32),
 }
 
@@ -119,24 +121,24 @@ mod test {
 
     #[test]
     fn test_line_column() {
-        let text = concat!("aaa\n", "  bbb\n", "ccc\n",);
+        let text = concat!("abc\n", "  def\n", "ghi\n",);
         let span = Span::new(6, 3);
 
-        assert_eq!("bbb", &text[span.to_range()]);
+        assert_eq!("def", &text[span.to_range()]);
 
         let code_span = span.line_column(text);
-        assert_eq!(2, code_span.line.0);
-        assert_eq!(1, code_span.line.1);
-        assert_eq!(3, code_span.column.0);
-        assert_eq!(3, code_span.column.1);
+        assert_eq!(2, code_span.line.0, "line start");
+        assert_eq!(1, code_span.line.1, "line size");
+        assert_eq!(3, code_span.column.0, "column start");
+        assert_eq!(3, code_span.column.1, "column size");
     }
 
     #[test]
     fn test_line_column_windows_crlf() {
-        let text = concat!("aaa\r\n", "  bbb\r\n", "ccc\r\n",);
+        let text = concat!("abc\r\n", "  def\r\n", "ghi\r\n",);
         let span = Span::new(7, 3);
 
-        assert_eq!("bbb", &text[span.to_range()]);
+        assert_eq!("def", &text[span.to_range()]);
 
         let code_span = span.line_column(text);
         assert_eq!(2, code_span.line.0);
@@ -148,17 +150,39 @@ mod test {
     /// Ensure that a Span at the end of a string doesn't overflow.
     #[test]
     fn test_line_column_end() {
-        let text = concat!("aaa\n", "bbb");
+        let text = concat!("abc\n", "def");
         let span = Span::new(4, 3);
 
-        println!("{} {span} {:?}", text.len(), span.to_range());
-        assert_eq!("bbb", &text[span.to_range()]);
+        assert_eq!("def", &text[span.to_range()]);
 
         let code_span = span.line_column(text);
         assert_eq!(2, code_span.line.0);
         assert_eq!(1, code_span.line.1);
         assert_eq!(1, code_span.column.0);
         assert_eq!(3, code_span.column.1);
+    }
+
+    /// Test case where a span crosses multiple lines
+    /// until the end of string.
+    ///
+    /// This ensures the `CodeSpan` is build and finished correctly.
+    ///
+    /// Practically during tokenisation a `Span` probably won't
+    /// ever cross a newline, but we ensure that it works to avoid
+    /// surprises if spans were added together.
+    #[test]
+    fn test_line_column_end_of_string() {
+        let text = concat!("abc\n", "def\n", "ghi");
+        let span = Span::new(4, 7);
+
+        assert_eq!("def\nghi", &text[span.to_range()]);
+
+        let code_span = span.line_column(text);
+        assert_eq!(2, code_span.line.0);
+        assert_eq!(2, code_span.line.1);
+        assert_eq!(1, code_span.column.0);
+        // FIXME: Newline should be excluded
+        assert_eq!(4, code_span.column.1);
     }
 
     // TODO: Test case: Span multiple lines and ends at end of string.
