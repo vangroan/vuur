@@ -5,6 +5,7 @@ mod ast;
 mod bytecode;
 mod error;
 mod span;
+mod string;
 mod tokens;
 
 pub use self::{

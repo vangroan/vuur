@@ -124,7 +124,9 @@ impl TokenKind {
             "eof"           => Ok(Self::EOF),
             "unknown"       => Ok(Self::Unknown),
 
-            _ => Err(DecodeError),
+            _ => {
+                Keyword::try_from(lexeme).map(TokenKind::Keyword).map_err(|_| DecodeError)
+            },
         }
     }
 }
@@ -265,6 +267,9 @@ impl std::fmt::Display for Keyword {
 
 /// Utility for decoding a [Token] and its [Span] from a line of text.
 ///
+/// This is not intended to be used in the compiler itself. It is for
+/// conveniently defining test cases for the lexical analysis.
+///
 /// ```non-rust
 /// if         0 2
 /// number     3 1
@@ -272,11 +277,26 @@ impl std::fmt::Display for Keyword {
 /// left-brace 7 1
 /// ```
 #[derive(Debug)]
-pub struct TokenDecoder;
+pub(super) struct TokenDecoder;
 
+#[allow(dead_code)]
 impl TokenDecoder {
-    pub fn decode(line: &str) -> Result<Token, DecodeError> {
-        let mut scanner = line.split_whitespace();
+    /// Decode multiple lines.
+    pub fn decode_lines(text: &str) -> Result<Vec<Token>, DecodeError> {
+        let tokens: Vec<Token> = text
+            .split('\n')
+            .map(|line| line.trim_matches('\r')) // windows :(
+            .filter(|line| !line.is_empty())
+            .map(|line| (line, TokenDecoder::decode_token(line)))
+            .map(|(line, result)| result.unwrap_or_else(|_| panic!("failed to decode line: '{line}'")))
+            .collect();
+
+        Ok(tokens)
+    }
+
+    /// Decode a single line into a token.
+    pub fn decode_token(line: &str) -> Result<Token, DecodeError> {
+        let mut scanner = line.trim().split_whitespace();
 
         let token_kind = scanner.next().ok_or_else(|| DecodeError)?;
         let start = scanner.next().ok_or_else(|| DecodeError)?;
@@ -303,6 +323,7 @@ impl std::fmt::Display for DecodeError {
 
 #[cfg(test)]
 mod test {
+    use super::Keyword::*;
     use super::TokenKind::*;
     use super::*;
 
@@ -346,11 +367,20 @@ mod test {
             ("newline      30  1", Token::new(Newline, Span::new(30, 1))),
             ("eof          31  1", Token::new(EOF, Span::new(31, 1))),
             ("unknown      32  1", Token::new(Unknown, Span::new(32, 1))),
+            // keywords ---
+            ("else         33  4", Token::new(Keyword(Else), Span::new(33, 4))),
+            ("func         37  4", Token::new(Keyword(Func), Span::new(37, 4))),
+            ("if           41  2", Token::new(Keyword(If), Span::new(41, 2))),
+            ("interface    43  9", Token::new(Keyword(Interface), Span::new(43, 9))),
+            ("return       52  6", Token::new(Keyword(Return), Span::new(52, 6))),
+            ("struct       58  6", Token::new(Keyword(Struct), Span::new(58, 6))),
+            ("type         64  4", Token::new(Keyword(Type), Span::new(64, 4))),
+            ("var          68  3", Token::new(Keyword(Var), Span::new(68, 3))),
         ];
 
         for (line, expected) in CASES {
             assert_eq!(
-                TokenDecoder::decode(line),
+                TokenDecoder::decode_token(line),
                 Ok(expected.clone()),
                 "case: {line} -> {expected}"
             );

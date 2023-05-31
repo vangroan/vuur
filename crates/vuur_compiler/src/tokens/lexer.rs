@@ -72,14 +72,14 @@ impl<'a> Lexer<'a> {
     /// When an iteration is done building a token, it must leave the cursor
     /// at the start of the next token's text. It may not finish leaving the
     /// cursor pointing into its own token.
-    pub fn next_token(&mut self) -> Token {
+    pub fn next_token(&mut self) -> Option<Token> {
         // Invariant of the lexer is that the cursor must
         // be pointing to the start of the remainder of the
         // source to be consumed.
-        self.start_token();
+        self.ignore_whitespace(); // <-- start_token
 
         if !self.cursor.at_end() {
-            match self.cursor.current() {
+            let token = match self.cursor.current() {
                 '(' => self.make_token(TokenKind::LeftParen),
                 ')' => self.make_token(TokenKind::RightParen),
                 '[' => self.make_token(TokenKind::LeftBracket),
@@ -117,13 +117,14 @@ impl<'a> Lexer<'a> {
                     // actually be at the end of the stream.
                     self.make_token(TokenKind::EOF)
                 }
-                c if Self::is_whitespace(c) => self.consume_whitespace(),
                 '\n' | '\r' => self.consume_newline(),
 
                 c if Self::is_digit(c) => self.consume_number(),
                 c if Self::is_letter(c) => self.consume_ident(),
                 _ => self.make_token(TokenKind::Unknown),
-            }
+            };
+
+            Some(token)
         } else {
             // The source stream has run out, so we signal
             // the caller by emitting an end-of-file token that
@@ -131,8 +132,10 @@ impl<'a> Lexer<'a> {
             //
             // The token's span thus points to the element
             // beyond the end of the collection, and has 0 length.
-            self.start_pos = self.cursor.peek_offset(); // TODO: Explicit string size
-            self.make_token(TokenKind::EOF)
+            // self.start_pos = self.cursor.peek_offset(); // TODO: Explicit string size
+            // self.make_token(TokenKind::EOF)
+
+            None
         }
     }
 
@@ -150,17 +153,25 @@ impl<'a> Lexer<'a> {
         self.start_pos = self.cursor.offset();
     }
 
-    fn token_span(&self) -> (usize, usize) {
-        let start = self.start_pos as usize;
-        let end = self.cursor.peek_offset() as usize;
-        (start, end)
+    /// Returns a [`Span`](struct.Span.html) for the current token.
+    #[inline]
+    fn token_span(&self) -> Span {
+        let start = self.start_pos;
+        let end = self.cursor.peek_offset();
+
+        // start and end can be equal, and a token can have 0 size.
+        debug_assert!(end >= start, "invariant: token end must be past token start");
+        let size = end - start;
+
+        Span::new(start, size)
     }
 
     /// Range from the start of the current token (inclusive) to
     /// the position one past the current (exclusive).
     #[inline(always)]
     fn token_range(&self) -> Range<usize> {
-        let (start, end) = self.token_span();
+        let start = self.start_pos as usize;
+        let end = self.cursor.peek_offset() as usize;
         start..end
     }
 
@@ -170,20 +181,12 @@ impl<'a> Lexer<'a> {
     ///
     /// Also prepare the cursor for the next iteration.
     fn make_token(&mut self, kind: TokenKind) -> Token {
-        let start = self.start_pos;
-        let end = self.cursor.peek_offset();
-
-        // start and end can be equal, and a token can have 0 size.
-        debug_assert!(end >= start);
-        let size = end - start;
+        let span = self.token_span();
 
         // After this token is built, the lexer's internal state
         // is no longer dedicated to this iteration, but to preparing
         // for the next iteration.
-        let token = Token {
-            span: Span::new(self.start_pos, size),
-            kind,
-        };
+        let token = Token { span, kind };
 
         // Position the cursor to the starting character for the
         // next token, so the lexer's internal state is primed
@@ -196,7 +199,17 @@ impl<'a> Lexer<'a> {
 
 /// Methods for consuming specific tokens.
 impl<'a> Lexer<'a> {
+    /// Skips over UTF-8 whitespace characters, and resets the token start.
+    fn ignore_whitespace(&mut self) {
+        while Self::is_whitespace(self.cursor.current()) {
+            self.cursor.bump();
+        }
+
+        self.start_token();
+    }
+
     /// Consume whitespace.
+    #[deprecated]
     fn consume_whitespace(&mut self) -> Token {
         debug_assert!(Self::is_whitespace(self.cursor.current()));
 
@@ -258,6 +271,7 @@ impl<'a> Lexer<'a> {
     ///
     /// Doesn't include newline characters, because in Vuur
     /// newline are significant, specifying end-of-statement.
+    #[inline]
     fn is_whitespace(c: char) -> bool {
         matches!(
             c,
@@ -309,10 +323,10 @@ impl<'a> Iterator for LexerIter<'a> {
                 None
             } else {
                 self.done = true;
-                Some(self.lexer.next_token())
+                self.lexer.next_token()
             }
         } else {
-            Some(self.lexer.next_token())
+            self.lexer.next_token()
         }
     }
 }
