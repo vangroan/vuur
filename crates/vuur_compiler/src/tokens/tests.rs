@@ -61,7 +61,7 @@ fn test_lexer() {
         for (index, pair) in zip.enumerate() {
             match pair {
                 Both(expected, actual) => {
-                    let fragment = string::unescape_string(expected.fragment(&case.input)).unwrap();
+                    let fragment = string::escape_ascii(expected.fragment(&case.input)).unwrap();
                     let are_equal = expected == actual;
                     if !are_equal {
                         failed += 1;
