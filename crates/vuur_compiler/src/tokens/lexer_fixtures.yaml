@@ -51,3 +51,24 @@
     mul          64  1
     identifier   66  1
     newline      67  1
+
+- input: |
+    func Fib(n: int) -> int {
+      // ...
+    }
+  output: |
+    func          0  4
+    identifier    5  3
+    left_paren    8  1
+    identifier    9  1
+    colon        10  1
+    identifier   12  3
+    right_paren  15  1
+    thin_arrow   17  2
+    identifier   20  3
+    left_brace   24  1
+    newline      25  1
+    comment_line 28  6
+    newline      34  1
+    right_brace  35  1
+    newline      36  1

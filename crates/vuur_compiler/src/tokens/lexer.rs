@@ -106,7 +106,15 @@ impl<'a> Lexer<'a> {
                     }
                 }
                 '*' => self.make_token(TokenKind::Mul),
-                '/' => self.make_token(TokenKind::Div),
+                '/' => {
+                    if self.cursor.peek() == '/' {
+                        self.consume_comment_line()
+                    } else if self.cursor.peek() == '*' {
+                        todo!("block comment")
+                    } else {
+                        self.make_token(TokenKind::Div)
+                    }
+                }
                 '&' => self.make_token(TokenKind::Ampersand),
                 ',' => self.make_token(TokenKind::Comma),
                 ':' => self.make_token(TokenKind::Colon),
@@ -218,6 +226,21 @@ impl<'a> Lexer<'a> {
         }
 
         self.make_token(TokenKind::Whitespace)
+    }
+
+    /// Consumes a line comment, which starts with // and ends with newline.
+    fn consume_comment_line(&mut self) -> Token {
+        debug_assert_eq!(self.cursor.current(), '/');
+        debug_assert_eq!(self.cursor.peek(), '/');
+
+        self.cursor.bump();
+        self.cursor.bump();
+
+        while !matches!(self.cursor.peek(), '\r' | '\n') {
+            self.cursor.bump();
+        }
+
+        self.make_token(TokenKind::CommentLine)
     }
 
     /// Consumes a single newline token.
