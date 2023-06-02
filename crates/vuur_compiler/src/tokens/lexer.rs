@@ -245,9 +245,8 @@ impl<'a> Lexer<'a> {
 
     /// Consumes a single newline token.
     fn consume_newline(&mut self) -> Token {
-        debug_assert!(matches!(self.cursor.current(), '\n' | '\r'));
+        debug_assert!(matches!(self.cursor.current(), '\r' | '\n'));
 
-        // TODO: assert current == \n
         // Windows carriage return
         if self.cursor.peek() == '\r' {
             self.cursor.bump();
