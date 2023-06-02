@@ -72,3 +72,49 @@
     newline      34  1
     right_brace  35  1
     newline      36  1
+
+- input: |
+    var x = 42
+  output: |
+    var           0  3
+    identifier    4  1
+    eq            6  1
+    number        8  2
+    newline      10  1
+
+- input: |
+    type Vec = [4]int
+  output: |
+    type            0  4
+    identifier      5  3
+    eq              9  1
+    left_bracket   11  1
+    number         12  1
+    right_bracket  13  1
+    identifier     14  3
+    newline        17  1
+
+- input: |
+    type Vec = struct {
+      x: int,
+      y: int,
+    }
+  output: |
+    type            0  4
+    identifier      5  3
+    eq              9  1
+    struct         11  6
+    left_brace     18  1
+    newline        19  1
+    identifier     22  1
+    colon          23  1
+    identifier     25  3
+    comma          28  1
+    newline        29  1
+    identifier     32  1
+    colon          33  1
+    identifier     35  3
+    comma          38  1
+    newline        39  1
+    right_brace    40  1
+    newline        41  1
