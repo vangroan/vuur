@@ -118,3 +118,26 @@
     newline        39  1
     right_brace    40  1
     newline        41  1
+
+- input: |
+    /* a */
+  output: |
+    comment_block  0 7
+    newline        7 1
+
+- input: |
+    /* block
+     * comment
+     */
+  output: |
+    comment_block  0  23
+    newline        23  1
+
+# Nested block comments
+- input: |
+    /* block
+     * /* comment
+     */ */
+  output: |
+    comment_block  0  29
+    newline        29  1

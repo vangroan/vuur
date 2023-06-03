@@ -110,7 +110,7 @@ impl<'a> Lexer<'a> {
                     if self.cursor.peek() == '/' {
                         self.consume_comment_line()
                     } else if self.cursor.peek() == '*' {
-                        todo!("block comment")
+                        self.consume_comment_block()
                     } else {
                         self.make_token(TokenKind::Div)
                     }
@@ -241,6 +241,46 @@ impl<'a> Lexer<'a> {
         }
 
         self.make_token(TokenKind::CommentLine)
+    }
+
+    /// Consumes a nested multi-line comment block which starts with /*.
+    fn consume_comment_block(&mut self) -> Token {
+        // The inner recursive function, which will include all possibly nested
+        // comment blocks into a single token.
+        fn inner(cursor: &mut Cursor<'_>) {
+            debug_assert_eq!(cursor.current_peek(), ('/', '*'));
+
+            cursor.bump();
+            cursor.bump();
+
+            loop {
+                match cursor.current_peek() {
+                    // END: Consume until block comment is closed, including new lines.
+                    ('*', '/') => {
+                        // Leave the cursor on the last character, the '/',
+                        // to make the token.
+                        cursor.bump();
+                        break;
+                    }
+                    // START: Another block comment has been nested inside this one,
+                    // but the resulting inner token will be discarded.
+                    ('/', '*') => {
+                        inner(cursor);
+                    }
+                    (EOF_CHAR, _) => {
+                        // TODO: Token errors
+                        panic!("unexpected end-of-file")
+                    }
+                    _ => {
+                        cursor.bump();
+                    }
+                }
+            }
+        }
+
+        inner(&mut self.cursor);
+
+        self.make_token(TokenKind::CommentBlock)
     }
 
     /// Consumes a single newline token.

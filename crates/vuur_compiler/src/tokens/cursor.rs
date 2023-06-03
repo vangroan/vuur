@@ -35,6 +35,11 @@ impl<'a> Cursor<'a> {
         self.prev.1
     }
 
+    /// Returns the current character, and peeks the next character.
+    pub fn current_peek(&self) -> (char, char) {
+        (self.current(), self.peek())
+    }
+
     /// Peek the next character without advancing the cursor.
     pub fn peek(&self) -> char {
         let mut iter = self.chars.clone();

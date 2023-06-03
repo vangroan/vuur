@@ -67,10 +67,7 @@ pub enum TokenKind {
     Interpolated,
 
     CommentLine,  // //
-    CommentLeft,  // /*
-    CommentRight, // */
-    /// Content of a block comment.
-    Comment,
+    CommentBlock, // /* */
 
     /// Spaces and tabs.
     #[deprecated]
@@ -116,9 +113,7 @@ impl TokenKind {
             "interp_str"    => Ok(Self::Interpolated),
             // ---
             "comment_line"  => Ok(Self::CommentLine),
-            "comment_left"  => Ok(Self::CommentLeft),
-            "comment_right" => Ok(Self::CommentRight),
-            "comment"       => Ok(Self::Comment),
+            "comment_block" => Ok(Self::CommentBlock),
             // ---
             "newline"       => Ok(Self::Newline),
             "eof"           => Ok(Self::EOF),
@@ -171,10 +166,8 @@ impl std::fmt::Display for TokenKind {
             T::Number           => write!(f, "number"),
             T::String           => write!(f, "string"),
             T::Interpolated     => write!(f, "interpolated"),
-            T::CommentLine      => write!(f, "//"),
-            T::CommentLeft      => write!(f, "/*"),
-            T::CommentRight     => write!(f, "*/"),
-            T::Comment          => write!(f, "comment"),
+            T::CommentLine      => write!(f, "comment_line"),
+            T::CommentBlock     => write!(f, "comment_block"),
             T::Whitespace       => write!(f, "whitespace"),
             T::Newline          => write!(f, "newline"),
             T::EOF              => write!(f, "end-of-file"),
@@ -359,10 +352,8 @@ mod test {
             ("string       24  1", Token::new(String, Span::new(24, 1))),
             ("interp_str   25  1", Token::new(Interpolated, Span::new(25, 1))),
             // ---
-            ("comment_line   26  1", Token::new(CommentLine, Span::new(26, 1))),
-            ("comment_left   27  1", Token::new(CommentLeft, Span::new(27, 1))),
-            ("comment_right  28  1", Token::new(CommentRight, Span::new(28, 1))),
-            ("comment        29  1", Token::new(Comment, Span::new(29, 1))),
+            ("comment_line  26  1", Token::new(CommentLine, Span::new(26, 1))),
+            ("comment_block 29  1", Token::new(CommentBlock, Span::new(29, 1))),
             // ---
             ("newline      30  1", Token::new(Newline, Span::new(30, 1))),
             ("eof          31  1", Token::new(EOF, Span::new(31, 1))),
