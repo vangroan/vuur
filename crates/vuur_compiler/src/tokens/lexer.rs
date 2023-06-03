@@ -105,7 +105,14 @@ impl<'a> Lexer<'a> {
                         self.make_token(TokenKind::Eq)
                     }
                 }
-                '*' => self.make_token(TokenKind::Mul),
+                '*' => {
+                    if self.cursor.peek() == '*' {
+                        self.cursor.bump();
+                        self.make_token(TokenKind::StarStar)
+                    } else {
+                        self.make_token(TokenKind::Mul)
+                    }
+                },
                 '/' => {
                     if self.cursor.peek() == '/' {
                         self.consume_comment_line()
