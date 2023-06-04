@@ -16,6 +16,13 @@
     mul          8 1
     number      10 1
 
+# exponent
+- input: "2 ** 8"
+  output: |
+    number       0 1
+    star_star    2 2
+    number       5 1
+
 - input: |
     if n == 0 {
       return 0
@@ -141,3 +148,50 @@
   output: |
     comment_block  0  29
     newline        29  1
+
+# Empty string
+- input: |
+    ""
+  output: |
+    string         0 2
+    newline        2 1
+
+- input: |
+    "abc"
+  output: |
+    string         0 5
+    newline        5 1
+
+- input: |
+    "abc %(1 + 2 * 3) def"
+  output: |
+    interp_str     0  7
+    number         7  1
+    add            9  1
+    number        11  1
+    mul           13  1
+    number        15  1
+    string        16  6
+    newline       22  1
+
+# Crazy nested interpolated strings
+#
+# Note that the arithmetic expression contains
+# parentheses which must not be treated as interpolation.
+- input: |
+    "a %( "b %( "c %( (1 + 2) * 3 ) d" ) e" ) f"
+  output: |
+    interp_str     0  5
+    interp_str     6  5
+    interp_str    12  5
+    left_paren    18  1
+    number        19  1
+    add           21  1
+    number        23  1
+    right_paren   24  1
+    mul           26  1
+    number        28  1
+    string        30  4
+    string        35  4
+    string        40  4
+    newline       44  1

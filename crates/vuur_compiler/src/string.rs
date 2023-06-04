@@ -11,6 +11,7 @@ pub fn escape_ascii(s: impl AsRef<str>) -> Result<String, UnescapeError> {
             '\n' => buf.push_str(r"\n"),
             '\r' => buf.push_str(r"\r"),
             '\t' => buf.push_str(r"\t"),
+            '"' => buf.push_str("\\\""),
             _ => buf.push(chr),
         }
     }

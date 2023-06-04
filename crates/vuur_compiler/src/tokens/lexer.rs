@@ -4,7 +4,9 @@ use std::ops::Range;
 
 use super::cursor::{Cursor, EOF_CHAR};
 use super::tokens::{Keyword, Token, TokenKind};
+use crate::limits::*;
 use crate::span::Span;
+use crate::stack::ArrayStack;
 
 /// Lexical analyser (tokeniser) for the Vuur language.
 pub struct Lexer<'a> {
@@ -17,6 +19,16 @@ pub struct Lexer<'a> {
     /// Absolute starting byte position of the current token
     /// in the source.
     start_pos: u32,
+    /// A stack keeping track of the parentheses inside nested
+    /// interpolated strings.
+    ///
+    /// Every slot on the stack represents an expression in an
+    /// interpolated string. The number in the slot is the count
+    /// of opening parentheses in that expression.
+    ///
+    /// When the count reaches 0, and a closing parentheses is
+    /// encountered, the expression has ended and the top is popped.
+    interp_stack: ArrayStack<MAX_INTERP_DEPTH, u32>,
 }
 
 impl<'a> Lexer<'a> {
@@ -39,6 +51,7 @@ impl<'a> Lexer<'a> {
             source_code,
             cursor,
             start_pos,
+            interp_stack: ArrayStack::new(),
         }
     }
 
@@ -80,14 +93,45 @@ impl<'a> Lexer<'a> {
 
         if !self.cursor.at_end() {
             let token = match self.cursor.current() {
-                '(' => self.make_token(TokenKind::LeftParen),
-                ')' => self.make_token(TokenKind::RightParen),
+                '(' => {
+                    // When the lexer is inside a interpolated string, then
+                    // keep track of the parentheses we encounter.
+                    if let Some(count) = self.interp_stack.top_mut() {
+                        *count += 1;
+                    }
+                    self.make_token(TokenKind::LeftParen)
+                }
+                ')' => {
+                    // Because parentheses are used for string interpolation,
+                    // there are special cases on whether to close the parentheses,
+                    // or continue with the rest of the string.
+                    if self.interp_stack.is_empty() {
+                        // Not currently in a string.
+                        self.make_token(TokenKind::RightParen)
+                    } else if self.interp_stack.top().copied() > Some(0) {
+                        // When the stack is keeping count, we are inside an
+                        // interpolated string, inside an expression that contains
+                        // nested parentheses. This could be an arithmetic grouping,
+                        // or a function call.
+                        if let Some(count) = self.interp_stack.top_mut() {
+                            *count -= 1;
+                        }
+                        self.make_token(TokenKind::RightParen)
+                    } else {
+                        // The lexer is currently inside an expression of an interpolated string,
+                        // and we just encountered the closing brace.
+                        //
+                        // The rest of the string needs to be tokenised.
+                        self.interp_stack.pop();
+                        self.consume_string()
+                    }
+                }
                 '[' => self.make_token(TokenKind::LeftBracket),
                 ']' => self.make_token(TokenKind::RightBracket),
                 '{' => self.make_token(TokenKind::LeftBrace),
                 '}' => self.make_token(TokenKind::RightBrace),
                 '.' => self.make_token(TokenKind::Dot),
-                // '"' => self.consume_string(TokenKind::String),
+                '"' => self.consume_string(),
                 '+' => self.make_token(TokenKind::Add),
                 '-' => {
                     if self.cursor.peek() == '>' {
@@ -112,7 +156,7 @@ impl<'a> Lexer<'a> {
                     } else {
                         self.make_token(TokenKind::Mul)
                     }
-                },
+                }
                 '/' => {
                     if self.cursor.peek() == '/' {
                         self.consume_comment_line()
@@ -309,6 +353,58 @@ impl<'a> Lexer<'a> {
             self.cursor.bump();
         }
         self.make_token(TokenKind::Number)
+    }
+
+    /// Consumes a string literal.
+    ///
+    /// ```non-rust
+    /// "abc %( 1 + 2 * 3 ) def"
+    /// ```
+    fn consume_string(&mut self) -> Token {
+        println!("consume_string current_peek {:?}", self.cursor.current_peek());
+        // A string literal can be started with a double-quote '"',
+        // or continued with a closing brace '}'.
+        debug_assert!(matches!(self.cursor.current(), '"' | ')'));
+
+        self.cursor.bump();
+
+        let mut kind = TokenKind::String;
+
+        loop {
+            match self.cursor.current_peek() {
+                // END
+                ('"', _) => break,
+                // Start of expression
+                ('%', '(') => {
+                    self.cursor.bump();
+                    kind = TokenKind::Interpolated;
+
+                    // Push a parentheses count onto the stack so
+                    // we can track the number of grouped expressions.
+                    //
+                    // This is necessary to know when to end the expression.
+                    self.interp_stack.push(0);
+
+                    // Finish off this string so the lexer can process the tokens
+                    // for the coming expression.
+                    break;
+                }
+                ('\n', _) => {
+                    // TODO: Lexer error
+                    panic!("unclosed string");
+                }
+                // Escape quote character
+                ('\\', '"') => {
+                    self.cursor.bump();
+                    self.cursor.bump();
+                }
+                _ => {
+                    self.cursor.bump();
+                }
+            }
+        }
+
+        self.make_token(kind)
     }
 
     fn consume_ident(&mut self) -> Token {

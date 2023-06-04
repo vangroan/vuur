@@ -4,7 +4,9 @@
 mod ast;
 mod bytecode;
 mod error;
+mod limits;
 mod span;
+mod stack;
 mod string;
 mod tokens;
 
