@@ -1,27 +1,43 @@
 - input: "1 + 2 * 3"
   output: |
-    number  0 1
+    number  0 1 1
     add     2 1
-    number  4 1
+    number  4 1 2
     mul     6 1
-    number  8 1
+    number  8 1 3
 
 - input: "(1 + 2) * 3"
   output: |
     left_paren   0 1
-    number       1 1
+    number       1 1 1
     add          3 1
-    number       5 1
+    number       5 1 2
     right_paren  6 1
     mul          8 1
-    number      10 1
+    number      10 1 3
 
 # exponent
 - input: "2 ** 8"
   output: |
-    number       0 1
+    number       0 1 2
     star_star    2 2
-    number       5 1
+    number       5 1 8
+
+- input: "0"
+  output: |
+    number       0 1 0
+
+- input: "2.0"
+  output: |
+    number_real  0 3 2.0
+
+- input: "0b0001"
+  output: |
+    number_bin   0 6 1
+
+- input: "0x501AF"
+  output: |
+    number_hex   0 7 501AF
 
 - input: |
     if n == 0 {
@@ -45,11 +61,11 @@
     if           30  2
     identifier   33  1
     eq_eq        35  2
-    number       38  1
+    number       38  1 1
     left_brace   40  1
     newline      41  1
     return       44  6
-    number       51  1
+    number       51  1 1
     newline      52  1
     right_brace  53  1
     newline      54  1
@@ -86,7 +102,7 @@
     var           0  3
     identifier    4  1
     eq            6  1
-    number        8  2
+    number        8  2 42
     newline      10  1
 
 - input: |
@@ -96,7 +112,7 @@
     identifier      5  3
     eq              9  1
     left_bracket   11  1
-    number         12  1
+    number         12  1 4
     right_bracket  13  1
     identifier     14  3
     newline        17  1
@@ -166,11 +182,11 @@
     "abc %(1 + 2 * 3) def"
   output: |
     interp_str     0  7
-    number         7  1
+    number         7  1 1
     add            9  1
-    number        11  1
+    number        11  1 2
     mul           13  1
-    number        15  1
+    number        15  1 3
     string        16  6
     newline       22  1
 
@@ -185,12 +201,12 @@
     interp_str     6  5
     interp_str    12  5
     left_paren    18  1
-    number        19  1
+    number        19  1 1
     add           21  1
-    number        23  1
+    number        23  1 2
     right_paren   24  1
     mul           26  1
-    number        28  1
+    number        28  1 3
     string        30  4
     string        35  4
     string        40  4

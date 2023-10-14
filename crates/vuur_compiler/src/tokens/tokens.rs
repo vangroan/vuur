@@ -10,11 +10,34 @@ use crate::span::Span;
 pub struct Token {
     pub kind: TokenKind,
     pub span: Span,
+    /// The parsed value of a number value, stored as raw bits.
+    pub num: u64,
 }
 
 impl Token {
     pub const fn new(kind: TokenKind, span: Span) -> Self {
-        Self { kind, span }
+        Self { kind, span, num: 0 }
+    }
+
+    /// Retrieve the token's number literal, if it's an integer number.
+    #[inline]
+    pub fn num_i64(&self) -> Option<i64> {
+        use NumFormat::*;
+        use TokenKind::*;
+
+        match &self.kind {
+            Number(Integral | Binary | Octal | Hexadecimal) => Some(self.num as i64),
+            _ => None,
+        }
+    }
+
+    /// Retrieve the token's number literal, if it's a floating point number.
+    #[inline]
+    pub fn num_f64(&self) -> Option<f64> {
+        match &self.kind {
+            TokenKind::Number(NumFormat::Real) => Some(f64::from_bits(self.num)),
+            _ => None,
+        }
     }
 
     /// Slice a text fragment from the given source code.
@@ -26,7 +49,7 @@ impl Token {
 
 impl std::fmt::Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Self { kind, span } = self;
+        let Self { kind, span, .. } = self;
         write!(f, "{kind} {span}")
     }
 }
@@ -60,7 +83,7 @@ pub enum TokenKind {
     /// Reserved identifiers
     Keyword(Keyword),
     /// Number Literal
-    Number,
+    Number(NumFormat),
     /// String Literal
     String,
     /// Part of an interpolated string, to the left or right of the expression.
@@ -108,7 +131,16 @@ impl TokenKind {
             "semicolon"     => Ok(Self::Semicolon),
             // ---
             "identifier"    => Ok(Self::Ident),
-            "number"        => Ok(Self::Number),
+            "number"        => Ok(Self::Number(NumFormat::Integral)),
+            "number_int"    => Ok(Self::Number(NumFormat::Integral)),
+            "number_sci"    => Ok(Self::Number(NumFormat::Scientific)),
+            "number_real"   => Ok(Self::Number(NumFormat::Real)),
+            "number_bin"    => Ok(Self::Number(NumFormat::Binary)),
+            "number_oct"    => Ok(Self::Number(NumFormat::Octal)),
+            "number_hex"    => Ok(Self::Number(NumFormat::Hexadecimal)),
+            _ if lexeme.starts_with("number") => {
+                Ok(Self::Number(NumFormat::decode(&lexeme[7..])?))
+            },
             "string"        => Ok(Self::String),
             "interp_str"    => Ok(Self::Interpolated),
             // ---
@@ -120,7 +152,7 @@ impl TokenKind {
             "unknown"       => Ok(Self::Unknown),
 
             _ => {
-                Keyword::try_from(lexeme).map(TokenKind::Keyword).map_err(|_| DecodeError)
+                Keyword::try_from(lexeme).map(TokenKind::Keyword).map_err(|_| DecodeError::new(format!("unrecognised token kind: {lexeme}")))
             },
         }
     }
@@ -163,7 +195,7 @@ impl std::fmt::Display for TokenKind {
             T::Semicolon        => write!(f, ";"),
             T::Ident            => write!(f, "identifier"),
             T::Keyword(keyword) => std::fmt::Display::fmt(keyword, f),
-            T::Number           => write!(f, "number"),
+            T::Number(format) => write!(f, "number_{}", format),
             T::String           => write!(f, "string"),
             T::Interpolated     => write!(f, "interpolated"),
             T::CommentLine      => write!(f, "comment_line"),
@@ -258,6 +290,47 @@ impl std::fmt::Display for Keyword {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NumFormat {
+    Integral,
+    Real,
+    Scientific,
+    Binary,
+    Octal,
+    Hexadecimal,
+}
+
+impl NumFormat {
+    #[rustfmt::skip]
+    pub fn decode(lexeme: &str) -> Result<Self, DecodeError> {
+        match lexeme {
+            "int"  => Ok(Self::Integral),
+            "real" => Ok(Self::Real),
+            "sci"  => Ok(Self::Scientific),
+            "bin"  => Ok(Self::Binary),
+            "oct"  => Ok(Self::Octal),
+            "hex"  => Ok(Self::Hexadecimal),
+            _      => Err(DecodeError::new(format!("unrecognised number format: {lexeme}"))),
+        }
+    }
+}
+
+impl std::fmt::Display for NumFormat {
+    #[rustfmt::skip]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = match self {
+            Self::Integral    => "int",
+            Self::Real        => "real",
+            Self::Scientific  => "sci",
+            Self::Binary      => "bin",
+            Self::Octal       => "oct",
+            Self::Hexadecimal => "hex",
+        };
+
+        std::fmt::Display::fmt(name, f)
+    }
+}
+
 /// Utility for decoding a [Token] and its [Span] from a line of text.
 ///
 /// This is not intended to be used in the compiler itself. It is for
@@ -291,22 +364,75 @@ impl TokenDecoder {
     pub fn decode_token(line: &str) -> Result<Token, DecodeError> {
         let mut scanner = line.trim().split_whitespace();
 
-        let token_kind = scanner.next().ok_or_else(|| DecodeError)?;
-        let start = scanner.next().ok_or_else(|| DecodeError)?;
-        let size = scanner.next().ok_or_else(|| DecodeError)?;
+        let token_fragment = scanner.next().ok_or_else(|| DecodeError::new("expected token kind"))?;
+        let token_kind = TokenKind::decode(token_fragment)?;
+        let start = scanner.next().ok_or_else(|| DecodeError::new("expected token span start"))?;
+        let size = scanner.next().ok_or_else(|| DecodeError::new("expected token span size"))?;
 
-        Ok(Token::new(
-            TokenKind::decode(token_kind)?,
-            Span::new(
+        let mut num_bits: u64 = 0;
+        if let Some(num_literal) = scanner.next() {
+            match token_kind {
+                TokenKind::Number(NumFormat::Integral) => {
+                    num_bits = num_literal
+                        .parse::<i64>()
+                        .map_err(|err| DecodeError::new("failed to parse integral number").with_cause(err))?
+                        as u64;
+                }
+                TokenKind::Number(NumFormat::Real) => {
+                    num_bits = num_literal
+                        .parse::<f64>()
+                        .map_err(|err| DecodeError::new("failed to parse real number").with_cause(err))?
+                        .to_bits();
+                }
+                TokenKind::Number(NumFormat::Scientific) => {
+                    unimplemented!("scientific notation is currently not supported");
+                }
+                TokenKind::Number(NumFormat::Binary) => {
+                    num_bits = u64::from_str_radix(num_literal, 2)
+                        .map_err(|err| DecodeError::new("failed to parse binary number").with_cause(err))?;
+                }
+                TokenKind::Number(NumFormat::Octal) => {
+                    num_bits = u64::from_str_radix(num_literal, 8)
+                        .map_err(|err| DecodeError::new("failed to parse octal number").with_cause(err))?;
+                }
+                TokenKind::Number(NumFormat::Hexadecimal) => {
+                    num_bits = u64::from_str_radix(num_literal, 16)
+                        .map_err(|err| DecodeError::new("failed to parse hexadecimal number").with_cause(err))?;
+                }
+                _ => { /* Not a number */ }
+            }
+        }
+
+        Ok(Token {
+            kind: token_kind,
+            span: Span::new(
                 u32::from_str_radix(start, 10).unwrap(),
                 u32::from_str_radix(size, 10).unwrap(),
             ),
-        ))
+            num: num_bits,
+        })
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct DecodeError;
+#[derive(Debug)]
+pub struct DecodeError {
+    message: String,
+    cause: Option<Box<dyn std::error::Error>>,
+}
+
+impl DecodeError {
+    fn new(message: impl ToString) -> Self {
+        Self {
+            message: message.to_string(),
+            cause: None,
+        }
+    }
+
+    fn with_cause(mut self, cause: impl 'static + std::error::Error) -> Self {
+        self.cause = Some(Box::new(cause));
+        self
+    }
+}
 
 impl std::fmt::Display for DecodeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -348,7 +474,10 @@ mod test {
             ("semicolon    21  1", Token::new(Semicolon, Span::new(21, 1))),
             // ---
             ("identifier   22  1", Token::new(Ident, Span::new(22, 1))),
-            ("number       23  1", Token::new(Number, Span::new(23, 1))),
+            (
+                "number       23  1",
+                Token::new(Number(NumFormat::Integral), Span::new(23, 1)),
+            ),
             ("string       24  1", Token::new(String, Span::new(24, 1))),
             ("interp_str   25  1", Token::new(Interpolated, Span::new(25, 1))),
             // ---
@@ -370,11 +499,8 @@ mod test {
         ];
 
         for (line, expected) in CASES {
-            assert_eq!(
-                TokenDecoder::decode_token(line),
-                Ok(expected.clone()),
-                "case: {line} -> {expected}"
-            );
+            let decoded_token = TokenDecoder::decode_token(line).expect("decode token");
+            assert_eq!(decoded_token, expected.clone(), "case: {line} -> {expected}");
         }
     }
 }

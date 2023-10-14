@@ -88,6 +88,8 @@ impl<const N: usize, T> ArrayStack<N, T> {
     }
 
     /// Retrieve the underlying array storage.
+    #[doc(hidden)]
+    #[allow(dead_code)]
     pub fn raw(&self) -> &[T; N] {
         &self.data
     }

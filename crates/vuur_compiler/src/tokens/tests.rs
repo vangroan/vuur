@@ -21,6 +21,7 @@ impl<'a> fmt::Display for TokenFormatter<'a> {
                 let Token {
                     kind,
                     span: Span { index, size },
+                    ..
                 } = token;
                 write!(f, "{kind} {index} {size}")
             }
@@ -66,6 +67,7 @@ fn test_lexer() {
                     if !are_equal {
                         failed += 1;
                     }
+                    println!("{expected:?} {actual:?}");
                     print_diff_line(index, are_equal, fragment.as_str(), Some(&expected), Some(&actual))
                 }
                 Left(expected) => {

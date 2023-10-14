@@ -7,6 +7,7 @@ use super::tokens::{Keyword, Token, TokenKind};
 use crate::limits::*;
 use crate::span::Span;
 use crate::stack::ArrayStack;
+use crate::tokens::tokens::NumFormat;
 
 /// Lexical analyser (tokeniser) for the Vuur language.
 pub struct Lexer<'a> {
@@ -28,6 +29,8 @@ pub struct Lexer<'a> {
     ///
     /// When the count reaches 0, and a closing parentheses is
     /// encountered, the expression has ended and the top is popped.
+    ///
+    /// See [`Self::consume_string()`]
     interp_stack: ArrayStack<MAX_INTERP_DEPTH, u32>,
 }
 
@@ -178,7 +181,7 @@ impl<'a> Lexer<'a> {
                 }
                 '\n' | '\r' => self.consume_newline(),
 
-                c if Self::is_digit(c) => self.consume_number(),
+                c if Self::is_digit(c) => self.parse_number(),
                 c if Self::is_letter(c) => self.consume_ident(),
                 _ => self.make_token(TokenKind::Unknown),
             };
@@ -234,6 +237,10 @@ impl<'a> Lexer<'a> {
         start..end
     }
 
+    fn token_fragment(&self) -> &str {
+        &self.source_code[self.token_range()]
+    }
+
     /// Build a token, using the source text from the position
     /// stored by [`start_token`](struct.Lexer.html#fn-start_token) to the
     /// current cursor position.
@@ -245,7 +252,25 @@ impl<'a> Lexer<'a> {
         // After this token is built, the lexer's internal state
         // is no longer dedicated to this iteration, but to preparing
         // for the next iteration.
-        let token = Token { span, kind };
+        let token = Token { span, kind, num: 0 };
+
+        // Position the cursor to the starting character for the
+        // next token, so the lexer's internal state is primed
+        // for the next iteration.
+        self.cursor.bump();
+
+        token
+    }
+
+    fn make_token_num(&mut self, kind: TokenKind, num: u64) -> Token {
+        println!("make_token_num({kind:?}, {num})");
+
+        let span = self.token_span();
+
+        // After this token is built, the lexer's internal state
+        // is no longer dedicated to this iteration, but to preparing
+        // for the next iteration.
+        let token = Token { span, kind, num };
 
         // Position the cursor to the starting character for the
         // next token, so the lexer's internal state is primed
@@ -345,14 +370,142 @@ impl<'a> Lexer<'a> {
         self.make_token(TokenKind::Newline)
     }
 
-    /// Consumes a number literal.
-    fn consume_number(&mut self) -> Token {
+    /// Parses a number literal.
+    ///
+    /// For simplicity sake numbers are parsed here in the lexical
+    /// analysis stage.
+    fn parse_number(&mut self) -> Token {
+        // The first character of a number must be a digit.
         debug_assert!(Self::is_digit(self.cursor.current()));
 
-        while Self::is_digit(self.cursor.peek()) {
-            self.cursor.bump();
+        // self.cursor.bump();
+
+        let mut format = NumFormat::Integral;
+        let mut bits: u64 = 0;
+
+        if self.cursor.current() == '0' {
+            match self.cursor.peek() {
+                // Binary number
+                'b' => {
+                    format = NumFormat::Binary;
+
+                    self.cursor.bump();
+
+                    if !Self::is_bin_digit(self.cursor.peek()) {
+                        // TODO: Error return type
+                        panic!("expected binary number digit");
+                    }
+
+                    while Self::is_bin_digit(self.cursor.peek()) {
+                        self.cursor.bump();
+                    }
+
+                    let mut range = self.token_range();
+                    range.start += 2;
+                    println!("number fragment: {}", &self.source_code[range.clone()]);
+                    bits = u64::from_str_radix(&self.source_code[range], 2).unwrap();
+                }
+                // Octal number
+                'o' => {
+                    format = NumFormat::Octal;
+
+                    self.cursor.bump();
+
+                    if !Self::is_oct_digit(self.cursor.peek()) {
+                        // TODO: Error return type
+                        panic!("expected octal number digit");
+                    }
+
+                    while Self::is_oct_digit(self.cursor.peek()) {
+                        self.cursor.bump();
+                    }
+                }
+                // Hexadecimal number
+                'x' => {
+                    format = NumFormat::Hexadecimal;
+
+                    self.cursor.bump();
+
+                    if !Self::is_oct_digit(self.cursor.peek()) {
+                        // TODO: Error return type
+                        panic!("expected octal number digit");
+                    }
+
+                    while Self::is_hex_digit(self.cursor.peek()) {
+                        self.cursor.bump();
+                    }
+
+                    let mut range = self.token_range();
+                    range.start += 2;
+                    println!("number fragment: {}", &self.source_code[range.clone()]);
+                    bits = u64::from_str_radix(&self.source_code[range], 16).unwrap();
+                }
+                // Integral number
+                //
+                // Integers can start with zeroes.
+                c if Self::is_digit(c) => {
+                    format = NumFormat::Integral;
+
+                    self.cursor.bump();
+                    while Self::is_digit(self.cursor.peek()) {
+                        self.cursor.bump();
+                    }
+
+                    bits = self.token_fragment().parse::<i64>().expect("parsing integral") as u64;
+                }
+                _ => { /* end number */ }
+            }
+
+            return self.make_token_num(TokenKind::Number(format), bits);
         }
-        self.make_token(TokenKind::Number)
+
+        // Integer, floating point or scientific
+        loop {
+            match self.cursor.peek() {
+                // Consume number digit.
+                c if Self::is_digit(c) => {
+                    self.cursor.bump();
+                }
+                'e' | 'E' => {
+                    format = NumFormat::Scientific;
+
+                    todo!("scientific number")
+                }
+                // Floating point number
+                '.' => {
+                    // Look ahead to ensure that the dot isn't followed by an identifier.
+                    // This is for method calls on number literals.
+                    if Lexer::is_letter(self.cursor.peek2()) {
+                        break;
+                    }
+
+                    // If we don't detect a method call on the integer literal,
+                    // it is converted to a floating point number.
+                    format = NumFormat::Real;
+
+                    self.cursor.bump(); // point
+
+                    // Numbers following the decimal point are optional.
+                    while Self::is_digit(self.cursor.peek()) {
+                        self.cursor.bump();
+                    }
+
+                    let range = self.token_range();
+                    let number: f64 = self.source_code[range].parse().unwrap();
+                    bits = number.to_bits();
+                    break;
+                }
+                // Encountered a non-numeral character.
+                //
+                // Terminate the parse and assume the number is an integer.
+                _ => {
+                    bits = self.token_fragment().parse::<i64>().expect("parsing integral") as u64;
+                    break;
+                }
+            }
+        }
+
+        self.make_token_num(TokenKind::Number(format), bits)
     }
 
     /// Consumes a string literal.
@@ -361,7 +514,6 @@ impl<'a> Lexer<'a> {
     /// "abc %( 1 + 2 * 3 ) def"
     /// ```
     fn consume_string(&mut self) -> Token {
-        println!("consume_string current_peek {:?}", self.cursor.current_peek());
         // A string literal can be started with a double-quote '"',
         // or continued with a closing brace '}'.
         debug_assert!(matches!(self.cursor.current(), '"' | ')'));
@@ -449,6 +601,18 @@ impl<'a> Lexer<'a> {
 
     fn is_digit(c: char) -> bool {
         matches!(c, '0'..='9')
+    }
+
+    fn is_bin_digit(c: char) -> bool {
+        matches!(c, '0'..='1')
+    }
+
+    fn is_oct_digit(c: char) -> bool {
+        matches!(c, '0'..='8')
+    }
+
+    fn is_hex_digit(c: char) -> bool {
+        matches!(c, '0'..='9' | 'a'..='f' | 'A'..='F')
     }
 
     fn is_letter(c: char) -> bool {
