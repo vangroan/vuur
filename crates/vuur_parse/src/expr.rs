@@ -308,7 +308,7 @@ pub enum CallArg {
     Block(Block),
 }
 
-/// Seperator for member access.
+/// Separator for member access.
 #[derive(Debug)]
 pub struct MemberSeparator;
 

@@ -1,0 +1,213 @@
+- input: "1 + 2 * 3"
+  output: |
+    number  0 1 1
+    add     2 1
+    number  4 1 2
+    mul     6 1
+    number  8 1 3
+
+- input: "(1 + 2) * 3"
+  output: |
+    left_paren   0 1
+    number       1 1 1
+    add          3 1
+    number       5 1 2
+    right_paren  6 1
+    mul          8 1
+    number      10 1 3
+
+# exponent
+- input: "2 ** 8"
+  output: |
+    number       0 1 2
+    star_star    2 2
+    number       5 1 8
+
+- input: "0"
+  output: |
+    number       0 1 0
+
+- input: "2.0"
+  output: |
+    number_real  0 3 2.0
+
+- input: "0b0001"
+  output: |
+    number_bin   0 6 1
+
+- input: "0x501AF"
+  output: |
+    number_hex   0 7 501AF
+
+- input: |
+    if n == 0 {
+      return 0
+    } else if n == 1 {
+      return 1
+    }
+    return n * n
+  output: |
+    if            0  2
+    identifier    3  1
+    eq_eq         5  2
+    number        8  1
+    left_brace   10  1
+    newline      11  1
+    return       14  6
+    number       21  1
+    newline      22  1
+    right_brace  23  1
+    else         25  4
+    if           30  2
+    identifier   33  1
+    eq_eq        35  2
+    number       38  1 1
+    left_brace   40  1
+    newline      41  1
+    return       44  6
+    number       51  1 1
+    newline      52  1
+    right_brace  53  1
+    newline      54  1
+    return       55  6
+    identifier   62  1
+    mul          64  1
+    identifier   66  1
+    newline      67  1
+
+- input: |
+    func Fib(n: int) -> int {
+      // ...
+    }
+  output: |
+    func          0  4
+    identifier    5  3
+    left_paren    8  1
+    identifier    9  1
+    colon        10  1
+    identifier   12  3
+    right_paren  15  1
+    thin_arrow   17  2
+    identifier   20  3
+    left_brace   24  1
+    newline      25  1
+    comment_line 28  6
+    newline      34  1
+    right_brace  35  1
+    newline      36  1
+
+- input: |
+    var x = 42
+  output: |
+    var           0  3
+    identifier    4  1
+    eq            6  1
+    number        8  2 42
+    newline      10  1
+
+- input: |
+    type Vec = [4]int
+  output: |
+    type            0  4
+    identifier      5  3
+    eq              9  1
+    left_bracket   11  1
+    number         12  1 4
+    right_bracket  13  1
+    identifier     14  3
+    newline        17  1
+
+- input: |
+    type Vec = struct {
+      x: int,
+      y: int,
+    }
+  output: |
+    type            0  4
+    identifier      5  3
+    eq              9  1
+    struct         11  6
+    left_brace     18  1
+    newline        19  1
+    identifier     22  1
+    colon          23  1
+    identifier     25  3
+    comma          28  1
+    newline        29  1
+    identifier     32  1
+    colon          33  1
+    identifier     35  3
+    comma          38  1
+    newline        39  1
+    right_brace    40  1
+    newline        41  1
+
+- input: |
+    /* a */
+  output: |
+    comment_block  0 7
+    newline        7 1
+
+- input: |
+    /* block
+     * comment
+     */
+  output: |
+    comment_block  0  23
+    newline        23  1
+
+# Nested block comments
+- input: |
+    /* block
+     * /* comment
+     */ */
+  output: |
+    comment_block  0  29
+    newline        29  1
+
+# Empty string
+- input: |
+    ""
+  output: |
+    string         0 2
+    newline        2 1
+
+- input: |
+    "abc"
+  output: |
+    string         0 5
+    newline        5 1
+
+- input: |
+    "abc %(1 + 2 * 3) def"
+  output: |
+    interp_str     0  7
+    number         7  1 1
+    add            9  1
+    number        11  1 2
+    mul           13  1
+    number        15  1 3
+    string        16  6
+    newline       22  1
+
+# Crazy nested interpolated strings
+#
+# Note that the arithmetic expression contains
+# parentheses which must not be treated as interpolation.
+- input: |
+    "a %( "b %( "c %( (1 + 2) * 3 ) d" ) e" ) f"
+  output: |
+    interp_str     0  5
+    interp_str     6  5
+    interp_str    12  5
+    left_paren    18  1
+    number        19  1 1
+    add           21  1
+    number        23  1 2
+    right_paren   24  1
+    mul           26  1
+    number        28  1 3
+    string        30  4
+    string        35  4
+    string        40  4
+    newline       44  1
