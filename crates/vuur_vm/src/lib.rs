@@ -6,15 +6,16 @@ use vuur_compile::bytecode::{decode_arg_a, decode_arg_k, decode_opcode, opcodes 
 use vuur_compile::Chunk;
 
 pub mod error;
-mod func_def;
-mod handle;
-mod instruction_set;
-mod module;
+pub mod handle;
+pub mod instruction_set;
 pub mod obj;
 #[doc(hidden)]
 pub mod symbol_table;
-mod value;
+pub mod value;
 pub mod vm_v2;
+
+#[cfg(test)]
+mod tests;
 
 use self::error::{ErrorKind, Result, RuntimeError};
 

@@ -7,25 +7,32 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::func_def::{Closure, ScriptFunc};
 use crate::handle::Handle;
 use crate::instruction_set::Op;
-use crate::module::Module;
+use crate::value::Module;
+use crate::value::Slot;
+use crate::value::{Closure, Program};
 
 const ENTRY_POINT: &str = "Main";
 
 #[derive(Debug)]
 pub struct VM {
     /// Current running fiber
-    pub(crate) fiber: Rc<RefCell<Fiber>>,
+    pub(crate) fiber: Option<Handle<Fiber>>,
     store: Store,
 }
 
 #[derive(Debug)]
-struct Store {
+pub struct Store {
     modules: HashMap<String, Rc<Module>>,
     /// Global table of function signatures.
     funcs: Vec<()>,
+}
+
+impl Store {
+    pub fn insert_func(&mut self) {
+        todo!("Insert function signature")
+    }
 }
 
 #[derive(Debug)]
@@ -40,10 +47,6 @@ struct CallFrame {
 pub struct Fiber {
     /// Operand stack
     pub(crate) stack: Vec<Slot>,
-    /// Top frame of the call stack.
-    ///
-    /// Kept outside the stack buffer to make access infallible.
-    pub(crate) frame: CallFrame,
     /// Stack of call frames (activation records).
     pub(crate) calls: Vec<CallFrame>,
 }
@@ -52,55 +55,40 @@ impl Fiber {
     pub fn new(closure: Handle<Closure>) -> Self {
         Self {
             stack: vec![],
-            frame: CallFrame { ip: 0, closure },
-            calls: vec![],
+            calls: vec![CallFrame { ip: 0, closure }],
         }
-    }
-}
-
-/// Slot is an untyped operand stack value.
-#[derive(Debug, Clone, Copy)]
-#[repr(transparent)]
-pub(crate) struct Slot(u64);
-
-impl Slot {
-    #[inline(always)]
-    pub(crate) fn from_i32(val: i32) -> Self {
-        Self(val as u64)
-    }
-
-    #[inline(always)]
-    pub(crate) fn to_i32(self) -> i32 {
-        self.0 as i32
-    }
-
-    #[inline(always)]
-    pub(crate) fn from_f32(val: f32) -> Self {
-        Self(val.to_bits() as u64)
-    }
-
-    #[inline(always)]
-    pub(crate) fn to_f32(self) -> f32 {
-        f32::from_bits(self.0 as u32)
     }
 }
 
 impl VM {
     pub fn new() -> Self {
-        todo!()
+        Self {
+            fiber: None,
+            store: Store {
+                modules: HashMap::new(),
+                funcs: vec![],
+            },
+        }
+    }
+
+    pub(crate) fn run_program(&mut self, program: &Program) -> Result<Slot, String> {
+        let module = program.module.clone();
+        let closure = program.closure.clone();
+
+        // Setup a fiber
+        let fiber = Handle::new(Fiber::new(closure));
+
+        let result = run_interpreter(self, fiber)?;
+
+        Ok(result)
     }
 
     /// Runs the entry point of the named module.
     pub fn run_entrypoint(&mut self, module_name: &str) -> Result<(), String> {
         if self.store.modules.get(module_name).is_none() {
-            self.store.modules.insert(
-                module_name.to_string(),
-                Rc::new(Module {
-                    name: module_name.to_string(),
-                    func_defs: vec![],
-                    vars: vec![],
-                }),
-            );
+            self.store
+                .modules
+                .insert(module_name.to_string(), Rc::new(Module::new(module_name)));
         }
 
         let module_rc = self.store.modules[module_name].clone();
@@ -129,6 +117,8 @@ impl Fiber {
 }
 
 enum FiberAction {
+    /// Return a value.
+    Return(Slot),
     /// Pause execution of the current fiber and yield control
     /// back to host.
     Yield,
@@ -144,16 +134,47 @@ enum RunAction {
 }
 
 /// Run the current fiber in the VM.
+// TODO: Instead of Slot, return a decent value that's usable in the Rust host.
+fn run_interpreter(vm: &mut VM, fiber: Handle<Fiber>) -> Result<Slot, String> {
+    vm.fiber = Some(fiber.clone());
+
+    loop {
+        let fiber = &mut *fiber.borrow_mut();
+
+        match run_fiber(vm, fiber)? {
+            FiberAction::Return(slot) => {
+                return Ok(slot);
+            }
+            FiberAction::Yield => {
+                todo!()
+            }
+        }
+    }
+}
+
 fn run_fiber(vm: &mut VM, fiber: &mut Fiber) -> Result<FiberAction, String> {
-    todo!()
+    let mut frame = fiber.calls.pop().ok_or_else(|| "fiber has no frames on its callstack")?;
+
+    loop {
+        match run_op_loop(vm, fiber, &mut frame)? {
+            RunAction::Return(slot) => {
+                // Current frame returned but there are no callers left on the stack.
+                if fiber.calls.is_empty() {
+                    return Ok(FiberAction::Return(slot));
+                }
+            }
+            RunAction::Call => {}
+            RunAction::Fiber(_) => {}
+        }
+    }
 }
 
 #[inline(always)]
-fn run_interpreter(fiber: &mut Fiber, frame: &mut CallFrame) -> Result<RunAction, String> {
+fn run_op_loop(vm: &mut VM, fiber: &mut Fiber, frame: &mut CallFrame) -> Result<RunAction, String> {
     let closure = frame.closure.clone();
     let func = closure.borrow_mut().func.clone();
 
-    'eval: loop {
+    loop {
         let op = func
             .code
             .get(frame.ip)
@@ -204,8 +225,14 @@ fn run_interpreter(fiber: &mut Fiber, frame: &mut CallFrame) -> Result<RunAction
                 let a = arg.to_i32();
                 fiber.stack.push(Slot::from_i32(a));
             }
-            _ => {
+            Op::Return => {
+                return Ok(RunAction::Return(fiber.stack.pop().unwrap_or(Slot::ZERO)));
+            }
+            Op::Abort => {
                 return Err("abort".to_string());
+            }
+            _ => {
+                return Err(format!("instruction not implemented yet: {op:?}"));
             }
         }
     }

@@ -1,6 +1,8 @@
 use std::fmt;
 use std::fmt::Formatter;
 
+use crate::value::{GlobalId, LocalId, UpValueId};
+
 /// Instruction set.
 #[derive(Debug, Clone, Copy)]
 #[allow(non_camel_case_types)]
@@ -19,6 +21,10 @@ pub enum Op {
     I32_Div,
     I32_Neg,
     I32_Eq,
+    I32_Less,
+    I32_Greater,
+    I32_LessEq,
+    I32_GreaterEq,
     I32_Cmp,
 
     /// Push a constant int32 value onto the operand stack.
@@ -31,26 +37,44 @@ pub enum Op {
 
     // ------------------------------------------------------------------------
     // Variables
+    Store_Global {
+        global_id: GlobalId,
+    },
+    Load_Global {
+        global_id: GlobalId,
+    },
     Store_Local {
-        local_id: Arg24,
+        local_id: LocalId,
     },
     Load_Local {
-        local_id: Arg24,
+        local_id: LocalId,
     },
-
-    // ------------------------------------------------------------------------
-    // Up-values
+    Store_Upvalue {
+        up_value_id: UpValueId,
+    },
+    Load_Upvalue {
+        up_value_id: UpValueId,
+    },
     /// "Close" the up-value, copying its inner value into its heap slot.
-    Upvalue_Close,
+    Upvalue_Close {
+        up_value_id: UpValueId,
+    },
 
     // ------------------------------------------------------------------------
     // Callables
-    /// Statically call a function identified by `func_id`.
-    Call_Func {
-        func_id: Arg24,
+    /// Call a closure instance on the stack.
+    Call_Closure {
+        arity: u8,
+    },
+    /// Call a method defined on a class.
+    Call_Method {
+        arity: u8,
+        func_id: u16,
     },
     Return,
     /// Create a closure instance.
+    ///
+    /// Expects a function definition to be on the top of the stack.
     Closure_Create,
 
     // ------------------------------------------------------------------------
@@ -58,11 +82,53 @@ pub enum Op {
     /// Unconditionally jump.
     Jump,
     /// Conditionally jump if the top of the operand stack is value 0, type int32.
-    Jump_False,
+    ///
+    /// Pop 1.
+    Jump_False {
+        addr: Arg24,
+    },
     /// Ends the current block.
     End,
-    /// Unconditionally error.
+    /// Unconditional error.
     Abort,
+}
+
+impl Op {
+    /// The effect on the operand stack that the instruction has.
+    pub fn stack_effect(&self) -> isize {
+        match self {
+            Op::NoOp => 0,
+            Op::Pop => -1,
+            Op::I32_Add => -1,
+            Op::I32_Sub => -1,
+            Op::I32_Mul => -1,
+            Op::I32_Div => -1,
+            Op::I32_Neg => 0,
+            Op::I32_Eq => -1,
+            Op::I32_Less => -1,
+            Op::I32_Greater => -1,
+            Op::I32_LessEq => -1,
+            Op::I32_GreaterEq => -1,
+            Op::I32_Cmp => -1,
+            Op::I32_Const { .. } => 1,
+            Op::I32_Const_Inline { .. } => 1,
+            Op::Store_Global { .. } => 0,
+            Op::Load_Global { .. } => 1,
+            Op::Store_Local { .. } => 0,
+            Op::Load_Local { .. } => 1,
+            Op::Store_Upvalue { .. } => 0,
+            Op::Load_Upvalue { .. } => 1,
+            Op::Upvalue_Close { .. } => 0,
+            Op::Call_Closure { arity } => -(*arity as isize) + 1,
+            Op::Call_Method { arity, .. } => -(*arity as isize), // remember receiver
+            Op::Return => -1,
+            Op::Closure_Create => 1,
+            Op::Jump => 0,
+            Op::Jump_False { .. } => -1,
+            Op::End => 0,
+            Op::Abort => 0,
+        }
+    }
 }
 
 pub type ConstantId = u16;
@@ -85,6 +151,12 @@ impl Arg24 {
         // Shift right to extend to cover up the least-significant bit,
         // and preserve the sign.
         i32::from_le_bytes([0, a, b, c]) >> 8
+    }
+
+    #[inline(always)]
+    pub fn from_u32(value: u32) -> Self {
+        let [a, b, c, _] = value.to_le_bytes();
+        Self([a, b, c])
     }
 
     #[inline(always)]

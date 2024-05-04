@@ -23,6 +23,7 @@
 //!
 //! let func_id = table.push(Func{});
 //! ```
+use std::fmt::{self, Formatter};
 use std::marker::PhantomData;
 
 /// Symbol table.
@@ -159,11 +160,46 @@ impl<K: Symbol, V> SymbolTable<K, V> {
         }
         &mut self.symbols[index]
     }
+
+    pub fn find<P>(&self, mut predicate: P) -> Option<(K, &V)>
+    where
+        P: FnMut(&V) -> bool,
+    {
+        self.symbols
+            .iter()
+            .enumerate()
+            .position(|(_, el)| predicate(el))
+            .map(|i| (K::from_usize(i), &self.symbols[i]))
+    }
+}
+
+impl<K: Symbol, V: PartialEq> SymbolTable<K, V> {
+    /// Lookup the symbol for the given value.
+    pub fn find_symbol(&self, value: &V) -> Option<K> {
+        self.symbols.iter().position(|el| *el == *value).map(K::from_usize)
+    }
 }
 
 impl<K, V> Default for SymbolTable<K, V> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl<K, V> fmt::Debug for SymbolTable<K, V>
+where
+    K: Symbol + fmt::Debug,
+    V: fmt::Debug,
+{
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let mut debug = f.debug_map();
+
+        for (index, value) in self.symbols.iter().enumerate() {
+            let symbol = K::from_usize(index);
+            debug.entry(&symbol, &value);
+        }
+
+        debug.finish()
     }
 }
 

@@ -2,7 +2,8 @@ use std::cell::RefCell;
 pub use std::cell::{Ref, RefMut};
 use std::fmt;
 use std::fmt::Formatter;
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
+pub use std::rc::Weak;
 
 /// Shared reference counted handle
 pub struct Handle<T>(Rc<RefCell<T>>);
@@ -31,6 +32,11 @@ impl<T> Handle<T> {
     #[inline(always)]
     pub fn try_borrow_mut(&self) -> Option<RefMut<'_, T>> {
         self.0.try_borrow_mut().ok()
+    }
+
+    #[inline(always)]
+    pub fn downgrade(&self) -> Weak<RefCell<T>> {
+        Rc::downgrade(&self.0)
     }
 }
 
