@@ -29,6 +29,10 @@ pub struct Closure {
     pub up_values: Vec<()>,
 }
 
+/// Function definition in the guest script.
+///
+/// It contains interpreter instructions which can be executed
+/// in the virtual machine.
 #[derive(Debug)]
 pub struct ScriptFunc {
     pub id: FuncId,

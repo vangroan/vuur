@@ -25,7 +25,6 @@
 //! ```
 use std::marker::PhantomData;
 
-
 /// Symbol table.
 pub struct SymbolTable<K, V> {
     symbols: Vec<V>,
@@ -109,7 +108,7 @@ impl<K: Symbol, V> SymbolTable<K, V> {
     ///
     /// Returns the symbol identifying the new location.
     pub fn push(&mut self, value: V) -> K {
-        if self.symbols.len()+1 > K::MAX {
+        if self.symbols.len() + 1 > K::MAX {
             panic!("symbol table overflowed maximum key space: {}", K::MAX);
         }
         let symbol = K::from_usize(self.symbols.len());

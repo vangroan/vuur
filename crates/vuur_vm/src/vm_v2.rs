@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::func_def::{Closure, ScriptFunc};
+use crate::handle::Handle;
 use crate::instruction_set::Op;
 use crate::module::Module;
 
@@ -31,8 +32,8 @@ struct Store {
 struct CallFrame {
     /// Instruction pointer
     ip: usize,
-    /// Reference to the closure instance that will be executed.
-    closure: Rc<RefCell<Closure>>,
+    /// Reference to the closure instance that is being executed.
+    closure: Handle<Closure>,
 }
 
 #[derive(Debug)]
@@ -48,7 +49,7 @@ pub struct Fiber {
 }
 
 impl Fiber {
-    pub fn new(closure: Rc<RefCell<Closure>>) -> Self {
+    pub fn new(closure: Handle<Closure>) -> Self {
         Self {
             stack: vec![],
             frame: CallFrame { ip: 0, closure },

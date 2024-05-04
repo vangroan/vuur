@@ -7,12 +7,14 @@ use vuur_compile::Chunk;
 
 pub mod error;
 mod func_def;
+mod handle;
 mod instruction_set;
 mod module;
 pub mod obj;
-pub mod vm_v2;
+#[doc(hidden)]
+pub mod symbol_table;
 mod value;
-#[doc(hidden)] pub mod symbol_table;
+pub mod vm_v2;
 
 use self::error::{ErrorKind, Result, RuntimeError};
 
