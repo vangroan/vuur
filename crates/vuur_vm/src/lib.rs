@@ -6,7 +6,13 @@ use vuur_compile::bytecode::{decode_arg_a, decode_arg_k, decode_opcode, opcodes 
 use vuur_compile::Chunk;
 
 pub mod error;
+mod func_def;
+mod instruction_set;
+mod module;
 pub mod obj;
+pub mod vm_v2;
+mod value;
+#[doc(hidden)] pub mod symbol_table;
 
 use self::error::{ErrorKind, Result, RuntimeError};
 
@@ -32,6 +38,9 @@ pub struct Fiber {
     /// ---------------------------
     pub(crate) error: Option<String>,
 }
+
+/// Operand stack slot, which encodes an untyped value.
+struct Slot(usize);
 
 #[derive(Debug)]
 struct FrameInfo {
@@ -135,6 +144,10 @@ impl Fiber {
         }
     }
 
+    pub fn run_v2(&mut self, chunk: &Chunk) {
+        todo!()
+    }
+
     pub fn run(&mut self, chunk: &Chunk) {
         println!("running...");
         'eval: loop {
@@ -161,7 +174,7 @@ impl Fiber {
 
             match op {
                 ops::NOOP => {
-                    println!("");
+                    println!("noop");
                     self.ip += 1
                 }
                 ops::POP => {
@@ -353,7 +366,7 @@ impl Fiber {
 
                         self.calls.push(FrameInfo {
                             base: stack_base,
-                            // after this insrtuction
+                            // after this instruction
                             return_addr: self.ip + 1,
                         });
                     }
