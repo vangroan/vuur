@@ -27,37 +27,19 @@ pub enum Op {
     I32_GreaterEq,
 
     /// Push a constant int32 value onto the operand stack.
-    I32_Const {
-        constant_id: ConstantId,
-    },
-    I32_Const_Inline {
-        arg: Arg24,
-    },
+    I32_Const(ConstantId),
+    I32_Const_Inline(Arg24),
 
     // ------------------------------------------------------------------------
     // Variables
-    Store_Global {
-        global_id: GlobalId,
-    },
-    Load_Global {
-        global_id: GlobalId,
-    },
-    Store_Local {
-        local_id: LocalId,
-    },
-    Load_Local {
-        local_id: LocalId,
-    },
-    Store_Upvalue {
-        up_value_id: UpValueId,
-    },
-    Load_Upvalue {
-        up_value_id: UpValueId,
-    },
+    Store_Global(GlobalId),
+    Load_Global(GlobalId),
+    Store_Local(LocalId),
+    Load_Local(LocalId),
+    Store_Upvalue(UpValueId),
+    Load_Upvalue(UpValueId),
     /// "Close" the up-value, copying its inner value into its heap slot.
-    Upvalue_Close {
-        up_value_id: UpValueId,
-    },
+    Upvalue_Close(UpValueId),
 
     // ------------------------------------------------------------------------
     // Callables
@@ -108,15 +90,15 @@ impl Op {
             Op::I32_Greater => -1,
             Op::I32_LessEq => -1,
             Op::I32_GreaterEq => -1,
-            Op::I32_Const { .. } => 1,
-            Op::I32_Const_Inline { .. } => 1,
-            Op::Store_Global { .. } => 0,
-            Op::Load_Global { .. } => 1,
-            Op::Store_Local { .. } => 0,
-            Op::Load_Local { .. } => 1,
-            Op::Store_Upvalue { .. } => 0,
-            Op::Load_Upvalue { .. } => 1,
-            Op::Upvalue_Close { .. } => 0,
+            Op::I32_Const(_) => 1,
+            Op::I32_Const_Inline(_) => 1,
+            Op::Store_Global(_) => 0,
+            Op::Load_Global(_) => 1,
+            Op::Store_Local(_) => 0,
+            Op::Load_Local(_) => 1,
+            Op::Store_Upvalue(_) => 0,
+            Op::Load_Upvalue(_) => 1,
+            Op::Upvalue_Close(_) => 0,
             Op::Call_Closure { arity } => -(*arity as isize) + 1,
             Op::Call_Method { arity, .. } => -(*arity as isize), // remember receiver
             Op::Return => -1,

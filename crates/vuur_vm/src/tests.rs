@@ -1,11 +1,13 @@
-use crate::value::{Slot, Value};
+use crate::value::{Value};
 use crate::{
     handle::Handle,
     instruction_set::{Arg24, Op},
     value::{Closure, ConstantId, GlobalId, LocalId, Module, Program, ScriptFunc},
-    vm_v2::{Store, VM},
+    vm_v2::{VM},
 };
+
 use std::rc::Rc;
+use std::time::{Instant, Duration};
 
 /// Create a recursive fibonacci script function.
 fn fibonacci(module: Handle<Module>) -> Rc<ScriptFunc> {
@@ -19,32 +21,26 @@ fn fibonacci(module: Handle<Module>) -> Rc<ScriptFunc> {
     let fib = GlobalId::new(0);
     let n = LocalId::new(0);
     let code = vec![
-        Op::Load_Local { local_id: n },
-        Op::I32_Const_Inline {
-            arg: Arg24::from_i32(1),
-        },
+        Op::Load_Local(n),
+        Op::I32_Const_Inline(Arg24::from_i32(1)),
         Op::I32_LessEq,
         Op::Jump_False {
             addr: Arg24::from_u32(6),
         },
-        Op::Load_Local { local_id: n },
+        Op::Load_Local(n),
         Op::Return,
         // Setup call to fib(n)
-        Op::Load_Global { global_id: fib },
+        Op::Load_Global(fib),
         // n - 1
-        Op::Load_Local { local_id: n },
-        Op::I32_Const_Inline {
-            arg: Arg24::from_i32(1),
-        },
+        Op::Load_Local(n),
+        Op::I32_Const_Inline(Arg24::from_i32(1)),
         Op::I32_Sub,
         Op::Call_Closure { arity: 1 },
         // Setup call to fib(n)
-        Op::Load_Global { global_id: fib },
+        Op::Load_Global(fib),
         // n - 2
-        Op::Load_Local { local_id: n },
-        Op::I32_Const_Inline {
-            arg: Arg24::from_i32(2),
-        },
+        Op::Load_Local(n),
+        Op::I32_Const_Inline(Arg24::from_i32(2)),
         Op::I32_Sub,
         Op::Call_Closure { arity: 1 },
         // fib(n - 1) + fib(n - 2)
@@ -74,17 +70,11 @@ fn test_vm_v2() {
 
     let code = vec![
         // func fib(n: Int) -> Int:
-        Op::Closure(ConstantId::new(0)), // create closure
-        Op::Store_Global {
-            global_id: GlobalId::new(0),
-        }, // Store closure in variable
+        Op::Closure(ConstantId::new(0)),    // create closure
+        Op::Store_Global(GlobalId::new(0)), // Store closure in variable
         // fib(5)
-        Op::Load_Global {
-            global_id: GlobalId::new(0),
-        }, // Load closure from variable
-        Op::I32_Const_Inline {
-            arg: Arg24::from_i32(fib_arg_1),
-        },
+        Op::Load_Global(GlobalId::new(0)), // Load closure from variable
+        Op::I32_Const_Inline(Arg24::from_i32(fib_arg_1)),
         Op::Call_Closure { arity: 1 },
         // Op::I32_Const_Inline {
         //     arg: Arg24::from_i32(1),
@@ -110,7 +100,9 @@ fn test_vm_v2() {
 
     // ---------------------------------------------------------------------------------------------
     let mut vm = VM::new();
+    let start = Instant::now();
     let value = vm.run_program(&program);
+    println!("time: {}µs", (Instant::now() - start).as_micros());
     println!("{value:?}");
     assert_eq!(value.unwrap().into_i32().unwrap(), 55);
 }

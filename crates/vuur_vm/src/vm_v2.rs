@@ -84,6 +84,7 @@ impl VM {
         }
     }
 
+    // #[inline(never)]
     pub(crate) fn run_program(&mut self, program: &Program) -> Result<Value, String> {
         let module = program.module.clone();
         let closure = program.closure.clone();
@@ -266,11 +267,11 @@ fn run_op_loop(_vm: &mut VM, fiber: &mut Fiber, frame: &mut CallFrame) -> Result
                 let [a, b] = fiber.pop_slots_2();
                 fiber.stack.push(Value::Bool(a.into_i32()? <= b.into_i32()?));
             }
-            Op::I32_Const_Inline { arg } => {
+            Op::I32_Const_Inline(arg) => {
                 let a = arg.to_i32();
                 fiber.stack.push(Value::from_i32(a));
             }
-            Op::Store_Global { global_id } => {
+            Op::Store_Global(global_id) => {
                 let module = func
                     .module
                     .upgrade()
@@ -278,7 +279,7 @@ fn run_op_loop(_vm: &mut VM, fiber: &mut Fiber, frame: &mut CallFrame) -> Result
                 let value = fiber.stack.pop().unwrap_or(Value::Nil);
                 module.borrow_mut().vars.insert(global_id, value);
             }
-            Op::Load_Global { global_id } => {
+            Op::Load_Global(global_id) => {
                 let module = func
                     .module
                     .upgrade()
@@ -286,14 +287,14 @@ fn run_op_loop(_vm: &mut VM, fiber: &mut Fiber, frame: &mut CallFrame) -> Result
                 let value = module.borrow_mut().vars.get(global_id).clone();
                 fiber.stack.push(value);
             }
-            Op::Store_Local { local_id } => {
+            Op::Store_Local(local_id) => {
                 let index = frame.stack_offset + local_id.to_usize();
                 if index >= fiber.stack.len() {
                     return Err("operand stack overflow".to_string());
                 }
                 fiber.stack[index] = fiber.stack.pop().ok_or_else(|| "operand stack underflow")?;
             }
-            Op::Load_Local { local_id } => {
+            Op::Load_Local(local_id) => {
                 let value = fiber
                     .stack
                     .get(frame.stack_offset + local_id.to_usize())
