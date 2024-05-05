@@ -102,6 +102,16 @@ impl<K, V> SymbolTable<K, V> {
             _key: PhantomData,
         }
     }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.symbols.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.symbols.is_empty()
+    }
 }
 
 impl<K: Symbol, V> SymbolTable<K, V> {
@@ -170,6 +180,18 @@ impl<K: Symbol, V> SymbolTable<K, V> {
             .enumerate()
             .position(|(_, el)| predicate(el))
             .map(|i| (K::from_usize(i), &self.symbols[i]))
+    }
+}
+
+impl<K, V: Default> SymbolTable<K, V> {
+    /// Grow the table to the specified size.
+    ///
+    /// Does nothing if the table's current size is equal or
+    /// greater than the requested size.
+    pub fn grow(&mut self, new_size: usize) {
+        for _ in 0..=(self.symbols.len().saturating_sub(new_size)) {
+            self.symbols.push(V::default());
+        }
     }
 }
 
@@ -256,5 +278,17 @@ mod test {
             assert_eq!(symbol2.to_usize(), 1);
             assert_eq!(symbol3.to_usize(), 2);
         }
+    }
+
+    #[test]
+    fn test_grow() {
+        symbol_impl!(struct Id(u32));
+
+        let mut table = SymbolTable::<Id, Option<u32>>::new();
+        assert_eq!(table.len(), 0);
+
+        table.grow(1);
+        assert_eq!(table.len(), 1);
+        assert!(table.get(Id(0)).is_none());
     }
 }

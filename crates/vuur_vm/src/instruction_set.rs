@@ -68,7 +68,7 @@ pub enum Op {
     Jump_False {
         addr: Arg24,
     },
-    /// Ends the current block.
+    /// Ends the current module.
     End,
     /// Unconditional error.
     Abort,

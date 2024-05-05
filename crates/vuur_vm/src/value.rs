@@ -1,8 +1,8 @@
-use crate::handle::Handle;
 use std::cell::RefCell;
 use std::fmt::{self, Formatter};
 use std::rc::{Rc, Weak};
 
+use crate::handle::Handle;
 use crate::instruction_set::Op;
 use crate::symbol_impl;
 use crate::symbol_table::{Symbol, SymbolTable};
@@ -25,6 +25,11 @@ symbol_impl!(
 symbol_impl!(
     /// Constant Id.
     #[derive(Debug, Clone, Copy)] pub struct ConstantId(u16)
+);
+
+symbol_impl!(
+    /// Class method Id.
+    #[derive(Debug, Clone, Copy)] pub struct MethodId(u32)
 );
 
 /// Dynamically typed value.
@@ -202,9 +207,17 @@ impl Module {
 }
 
 #[derive(Debug)]
-pub enum Func {
+pub enum Method {
     Script(Rc<ScriptFunc>),
     Native(NativeFunc),
+}
+
+pub struct Class {
+    /// Table of methods belonging to this class.
+    ///
+    /// This corresponds with the global method signature
+    /// table in [`Store`].
+    methods: SymbolTable<MethodId, Option<Method>>,
 }
 
 #[derive(Debug)]

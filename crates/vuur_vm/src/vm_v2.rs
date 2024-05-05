@@ -7,8 +7,9 @@ use std::rc::Rc;
 
 use crate::handle::Handle;
 use crate::instruction_set::Op;
-use crate::symbol_table::Symbol;
-use crate::value::{Closure, Module, Program, Slot, Value};
+use crate::store::Store;
+use crate::symbol_table::{Symbol, SymbolTable};
+use crate::value::{Closure, MethodId, Module, Program, Slot, Value};
 
 const ENTRY_POINT: &str = "Main";
 
@@ -17,22 +18,6 @@ pub struct VM {
     /// Current running fiber
     pub(crate) fiber: Option<Handle<Fiber>>,
     store: Store,
-}
-
-#[derive(Debug)]
-pub struct Store {
-    modules: HashMap<String, Rc<Module>>,
-    /// Global table of method signatures.
-    ///
-    /// The symbol from this table can be used to index into a class'
-    /// methods. This is the method-overloading mechanism.
-    methods: Vec<()>,
-}
-
-impl Store {
-    pub fn insert_func(&mut self) {
-        todo!("Insert function signature")
-    }
 }
 
 #[derive(Debug)]
@@ -79,13 +64,13 @@ impl VM {
             fiber: None,
             store: Store {
                 modules: HashMap::new(),
-                methods: vec![],
+                methods: SymbolTable::new(),
             },
         }
     }
 
     // #[inline(never)]
-    pub(crate) fn run_program(&mut self, program: &Program) -> Result<Value, String> {
+    pub fn run_program(&mut self, program: &Program) -> Result<Value, String> {
         let module = program.module.clone();
         let closure = program.closure.clone();
 
@@ -326,6 +311,9 @@ fn run_op_loop(_vm: &mut VM, fiber: &mut Fiber, frame: &mut CallFrame) -> Result
                 if matches!(value, Value::Bool(false)) {
                     frame.ip = addr.to_u32() as usize;
                 }
+            }
+            Op::End => {
+                unreachable!("module end")
             }
             Op::Abort => {
                 return Err("abort".to_string());

@@ -7,7 +7,7 @@ use crate::{
 };
 
 use std::rc::Rc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 /// Create a recursive fibonacci script function.
 fn fibonacci(module: Handle<Module>) -> Rc<ScriptFunc> {
@@ -84,6 +84,7 @@ fn test_vm_v2() {
         // },
         // Op::I32_Add,
         Op::Return,
+        Op::End,
     ];
 
     // Module top-level code.
