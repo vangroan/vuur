@@ -1,13 +1,13 @@
-use crate::value::{Value};
+use crate::value::Value;
 use crate::{
     handle::Handle,
     instruction_set::{Arg24, Op},
     value::{Closure, ConstantId, GlobalId, LocalId, Module, Program, ScriptFunc},
-    vm_v2::{VM},
+    vm_v2::VM,
 };
 
 use std::rc::Rc;
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
 /// Create a recursive fibonacci script function.
 fn fibonacci(module: Handle<Module>) -> Rc<ScriptFunc> {
