@@ -1,7 +1,7 @@
 use std::fmt;
 use std::fmt::Formatter;
 
-use crate::value::{GlobalId, LocalId, UpValueId};
+use crate::value::{ConstantId, GlobalId, LocalId, UpValueId};
 
 /// Instruction set.
 #[derive(Debug, Clone, Copy)]
@@ -25,7 +25,6 @@ pub enum Op {
     I32_Greater,
     I32_LessEq,
     I32_GreaterEq,
-    I32_Cmp,
 
     /// Push a constant int32 value onto the operand stack.
     I32_Const {
@@ -72,10 +71,10 @@ pub enum Op {
         func_id: u16,
     },
     Return,
-    /// Create a closure instance.
-    ///
-    /// Expects a function definition to be on the top of the stack.
-    Closure_Create,
+
+    /// Create a closure instance from the function definition stored
+    /// in the constant table of the current call frame.
+    Closure(ConstantId),
 
     // ------------------------------------------------------------------------
     // Control Flow
@@ -109,7 +108,6 @@ impl Op {
             Op::I32_Greater => -1,
             Op::I32_LessEq => -1,
             Op::I32_GreaterEq => -1,
-            Op::I32_Cmp => -1,
             Op::I32_Const { .. } => 1,
             Op::I32_Const_Inline { .. } => 1,
             Op::Store_Global { .. } => 0,
@@ -122,7 +120,7 @@ impl Op {
             Op::Call_Closure { arity } => -(*arity as isize) + 1,
             Op::Call_Method { arity, .. } => -(*arity as isize), // remember receiver
             Op::Return => -1,
-            Op::Closure_Create => 1,
+            Op::Closure(_) => 1,
             Op::Jump => 0,
             Op::Jump_False { .. } => -1,
             Op::End => 0,
@@ -130,8 +128,6 @@ impl Op {
         }
     }
 }
-
-pub type ConstantId = u16;
 
 /// Bytecode argument packed into 24 bits, encoded in little-endian.
 #[derive(Clone, Copy, PartialEq, Eq)]

@@ -1,15 +1,15 @@
-use crate::value::{GlobalId, LocalId, Program};
+use crate::value::{Slot, Value};
 use crate::{
     handle::Handle,
     instruction_set::{Arg24, Op},
-    value::{Closure, Module, ScriptFunc},
+    value::{Closure, ConstantId, GlobalId, LocalId, Module, Program, ScriptFunc},
     vm_v2::{Store, VM},
 };
 use std::rc::Rc;
 
 /// Create a recursive fibonacci script function.
-fn fibonacci(store: &mut Store, module: Handle<Module>) {
-    // func fib(n: Int) {
+fn fibonacci(module: Handle<Module>) -> Rc<ScriptFunc> {
+    // func fib(n: Int) -> Int {
     //    if n <= 1 {
     //        return n
     //    } else {
@@ -25,7 +25,7 @@ fn fibonacci(store: &mut Store, module: Handle<Module>) {
         },
         Op::I32_LessEq,
         Op::Jump_False {
-            addr: Arg24::from_u32(0),
+            addr: Arg24::from_u32(6),
         },
         Op::Load_Local { local_id: n },
         Op::Return,
@@ -49,27 +49,58 @@ fn fibonacci(store: &mut Store, module: Handle<Module>) {
         Op::Call_Closure { arity: 1 },
         // fib(n - 1) + fib(n - 2)
         Op::I32_Add,
+        Op::Return,
     ];
+
+    Rc::new(ScriptFunc {
+        constants: vec![],
+        code: code.into_boxed_slice(),
+        module: module.downgrade(),
+    })
 }
 
 #[test]
 fn test_vm_v2() {
+    let fib_arg_1 = 10;
+
     let module = Handle::new(Module::new("__main__"));
 
+    // Global variable slots would be determined by top-level `var` and `func` statements.
+    for _ in 0..1 {
+        module.borrow_mut().vars.push(Value::Nil);
+    }
+
+    let fib_func = fibonacci(module.clone());
+
     let code = vec![
+        // func fib(n: Int) -> Int:
+        Op::Closure(ConstantId::new(0)), // create closure
+        Op::Store_Global {
+            global_id: GlobalId::new(0),
+        }, // Store closure in variable
+        // fib(5)
+        Op::Load_Global {
+            global_id: GlobalId::new(0),
+        }, // Load closure from variable
         Op::I32_Const_Inline {
-            arg: Arg24::from_i32(1),
+            arg: Arg24::from_i32(fib_arg_1),
         },
-        Op::I32_Const_Inline {
-            arg: Arg24::from_i32(2),
-        },
-        Op::I32_Add,
+        Op::Call_Closure { arity: 1 },
+        // Op::I32_Const_Inline {
+        //     arg: Arg24::from_i32(1),
+        // },
+        // Op::I32_Const_Inline {
+        //     arg: Arg24::from_i32(2),
+        // },
+        // Op::I32_Add,
         Op::Return,
     ];
 
     // Module top-level code.
     let func = Rc::new(ScriptFunc {
-        constants: vec![],
+        constants: vec![
+            Value::Func(fib_func), // ConstantId(0)
+        ],
         code: code.into_boxed_slice(),
         module: module.downgrade(),
     });
@@ -79,7 +110,7 @@ fn test_vm_v2() {
 
     // ---------------------------------------------------------------------------------------------
     let mut vm = VM::new();
-    let slot = vm.run_program(&program);
-    println!("{slot:?}");
-    assert_eq!(slot.unwrap().raw(), 3);
+    let value = vm.run_program(&program);
+    println!("{value:?}");
+    assert_eq!(value.unwrap().into_i32().unwrap(), 55);
 }

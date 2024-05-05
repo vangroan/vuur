@@ -18,9 +18,89 @@ symbol_impl!(
 );
 
 symbol_impl!(
-    /// Local variable Id.
+    /// Up-value variable Id.
     #[derive(Debug, Clone, Copy)] pub struct UpValueId(u16)
 );
+
+symbol_impl!(
+    /// Constant Id.
+    #[derive(Debug, Clone, Copy)] pub struct ConstantId(u16)
+);
+
+/// Dynamically typed value.
+///
+/// This is to simplify the internals of the VM for the short term.
+/// In the future the VM will be statically typed.
+///
+/// See [`Slot`]
+#[derive(Clone)]
+pub enum Value {
+    Nil,
+    Bool(bool),
+    Int(i32),
+    Float(f32),
+    Str(Handle<String>),
+
+    // ------------------------------------------------------------------------
+    // Reference type objects.
+    Func(Rc<ScriptFunc>),
+    Closure(Handle<Closure>),
+    Native(Handle<NativeFunc>),
+}
+
+impl fmt::Debug for Value {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        use Value::*;
+
+        // There are plenty of opportunities for circular
+        // references, so we don't recurse into complex objects.
+        match self {
+            Nil => write!(f, "Nil"),
+            Bool(v) => f.debug_tuple("Bool").field(&v).finish(),
+            Int(v) => f.debug_tuple("Int").field(&v).finish(),
+            Float(v) => f.debug_tuple("Float").field(&v).finish(),
+            Str(v) => f.debug_tuple("Str").field(&v).finish(),
+            Func(_) => write!(f, "Func(...)"),
+            Closure(_) => write!(f, "Closure(...)"),
+            Native(_) => write!(f, "Native(...)"),
+        }
+    }
+}
+
+impl Value {
+    #[inline(always)]
+    pub fn into_func(self) -> Result<Rc<ScriptFunc>, String> {
+        match self {
+            Value::Func(func) => Ok(func),
+            _ => Err(self.type_error()),
+        }
+    }
+
+    #[inline(always)]
+    pub fn into_closure(self) -> Result<Handle<Closure>, String> {
+        match self {
+            Value::Closure(closure) => Ok(closure),
+            _ => Err(self.type_error()),
+        }
+    }
+
+    #[inline(always)]
+    pub fn into_i32(self) -> Result<i32, String> {
+        match self {
+            Value::Int(int) => Ok(int),
+            _ => Err(self.type_error()),
+        }
+    }
+
+    #[inline(always)]
+    pub fn from_i32(value: i32) -> Self {
+        Self::Int(value)
+    }
+
+    fn type_error(&self) -> String {
+        format!("unexpected value type: {self:?}")
+    }
+}
 
 /// An executable Vuur program.
 pub struct Program {
@@ -44,8 +124,18 @@ impl Program {
 ///
 /// It holds the raw bits of a value. The encoding is
 /// specific to the current platform.
+///
+/// FIXME: Storing reference type object pointers in a slot.
+///
+/// To keep the VM simple, the standard library `Rc` is used
+/// for reference types. It doesn't expose its internal pointer,
+/// making it hard to build unsafe internals around it.
+///
+/// When we have a proper garbage collector with our own
+/// handle types we can revisit `Slot`.
 #[derive(Clone, Copy)]
 #[repr(transparent)]
+#[allow(dead_code)]
 pub(crate) struct Slot(u64);
 
 impl Slot {
@@ -75,6 +165,16 @@ impl Slot {
     pub(crate) fn to_f32(self) -> f32 {
         f32::from_bits(self.0 as u32)
     }
+
+    #[inline(always)]
+    pub(crate) fn from_ptr<T>(ptr: *const T) -> Self {
+        Self(ptr as usize as u64)
+    }
+
+    #[inline(always)]
+    pub(crate) unsafe fn to_ptr<T>(self) -> *mut T {
+        self.0 as usize as *mut T
+    }
 }
 
 impl fmt::Debug for Slot {
@@ -89,7 +189,7 @@ pub struct Module {
     /// Name of the module.
     pub name: String,
     /// Module level global variables.
-    pub vars: SymbolTable<GlobalId, Slot>,
+    pub vars: SymbolTable<GlobalId, Value>,
 }
 
 impl Module {
@@ -161,7 +261,10 @@ pub enum UpValue {
 /// so it can be stored without `RefCell`.
 #[derive(Debug)]
 pub struct ScriptFunc {
-    pub constants: Vec<u32>,
+    /// Values defined in the function body that do not change.
+    pub constants: Vec<Value>,
+
+    /// Interpreter bytecode instructions to be executed.
     pub code: Box<[Op]>,
 
     /// The function keeps a reference to the module it lexically belongs to.
@@ -178,6 +281,7 @@ pub struct ScriptFunc {
 
 pub type NativeFuncPtr = fn() -> ();
 
+/// Host function defined in Rust.
 #[derive(Debug)]
 pub struct NativeFunc {
     pub ptr: NativeFuncPtr,
@@ -192,6 +296,7 @@ mod test {
     /// Ensure that a slot can hold a pointer on the current architecture.
     #[test]
     fn test_slot_size() {
+        println!("{}", std::mem::size_of::<Value>());
         assert!(std::mem::size_of::<*const [u8; 1024]>() <= std::mem::size_of::<Slot>());
         assert!(std::mem::size_of::<Handle<[u8; 1024]>>() <= std::mem::size_of::<Slot>());
         assert!(std::mem::size_of::<Rc<[u8; 1024]>>() <= std::mem::size_of::<Slot>());

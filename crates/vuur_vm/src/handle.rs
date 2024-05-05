@@ -6,7 +6,7 @@ use std::rc::Rc;
 pub use std::rc::Weak;
 
 /// Shared reference counted handle
-pub struct Handle<T>(Rc<RefCell<T>>);
+pub struct Handle<T: ?Sized>(Rc<RefCell<T>>);
 
 impl<T> Handle<T> {
     #[inline(always)]
@@ -40,7 +40,7 @@ impl<T> Handle<T> {
     }
 }
 
-impl<T> Clone for Handle<T> {
+impl<T: ?Sized> Clone for Handle<T> {
     #[inline(always)]
     fn clone(&self) -> Self {
         Self(self.0.clone())
@@ -49,13 +49,13 @@ impl<T> Clone for Handle<T> {
 
 impl<T> fmt::Debug for Handle<T>
 where
-    T: fmt::Debug,
+    T: ?Sized + fmt::Debug,
 {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let mut debug = f.debug_tuple("Handle");
 
         match self.0.try_borrow() {
-            Ok(value) => debug.field(&*value).finish(),
+            Ok(value) => debug.field(&&*value).finish(),
             Err(_) => debug.field(&"_").finish(),
         }
     }

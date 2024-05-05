@@ -12,3 +12,7 @@ vuur_parse = { path = "../vuur_parse" }
 
 # Dynamic Objects
 bytemuck = "1.13"
+
+[features]
+# Prints opcode instructions as they are interpreted.
+trace_ops = []
