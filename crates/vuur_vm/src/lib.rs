@@ -14,6 +14,7 @@ pub mod symbol_table;
 pub mod value;
 pub mod vm_v2;
 
+mod core;
 mod store;
 #[cfg(test)]
 mod tests;

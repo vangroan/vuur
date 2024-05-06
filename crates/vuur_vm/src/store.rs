@@ -21,10 +21,18 @@ pub struct Store {
     ///
     /// The symbol from this table can be used to index into a class' methods.
     /// This is the method-overloading mechanism.
-    pub(crate) methods: SymbolTable<MethodId, MethodSig>,
+    // TODO: MethodSig instead of String
+    pub(crate) methods: SymbolTable<MethodId, String>,
 }
 
 impl Store {
+    pub fn new() -> Self {
+        Self {
+            modules: HashMap::new(),
+            methods: SymbolTable::new(),
+        }
+    }
+
     pub fn insert_func(&mut self) {
         todo!("Insert function signature")
     }
@@ -38,6 +46,10 @@ pub struct MethodSig {
     pub return_: (),
 }
 
+// `fib(Int32) -> Int32`
+// `replace(Str,Str) -> Str`
+// `static validate(Int32) -> Bool`
+// `native static sqrt(Float) -> Float`
 #[derive(Clone, Copy)]
 pub struct MethodFlags(u32);
 

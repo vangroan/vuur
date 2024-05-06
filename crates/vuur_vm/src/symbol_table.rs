@@ -181,6 +181,10 @@ impl<K: Symbol, V> SymbolTable<K, V> {
             .position(|(_, el)| predicate(el))
             .map(|i| (K::from_usize(i), &self.symbols[i]))
     }
+
+    pub fn iter(&self) -> Iter<K, V> {
+        Iter { table: self, index: 0 }
+    }
 }
 
 impl<K, V: Default> SymbolTable<K, V> {
@@ -222,6 +226,27 @@ where
         }
 
         debug.finish()
+    }
+}
+
+pub struct Iter<'a, K, V> {
+    table: &'a SymbolTable<K, V>,
+    index: usize,
+}
+
+impl<'a, K: Symbol, V> Iterator for Iter<'a, K, V> {
+    type Item = (K, &'a V);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.table.len() {
+            let index = self.index;
+            self.index += 1;
+            let symbol = K::from_usize(index);
+            Some((symbol, &self.table.symbols[index]))
+        } else {
+            None
+        }
     }
 }
 

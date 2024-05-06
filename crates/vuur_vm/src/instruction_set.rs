@@ -27,7 +27,7 @@ pub enum Op {
     I32_GreaterEq,
 
     /// Push a constant int32 value onto the operand stack.
-    I32_Const(ConstantId),
+    Const(ConstantId),
     I32_Const_Inline(Arg24),
 
     // ------------------------------------------------------------------------
@@ -45,6 +45,9 @@ pub enum Op {
     // Callables
     /// Call a closure instance on the stack.
     Call_Closure {
+        arity: u8,
+    },
+    Call_Native {
         arity: u8,
     },
     /// Call a method defined on a class.
@@ -90,7 +93,7 @@ impl Op {
             Op::I32_Greater => -1,
             Op::I32_LessEq => -1,
             Op::I32_GreaterEq => -1,
-            Op::I32_Const(_) => 1,
+            Op::Const(_) => 1,
             Op::I32_Const_Inline(_) => 1,
             Op::Store_Global(_) => 0,
             Op::Load_Global(_) => 1,
@@ -100,6 +103,7 @@ impl Op {
             Op::Load_Upvalue(_) => 1,
             Op::Upvalue_Close(_) => 0,
             Op::Call_Closure { arity } => -(*arity as isize) + 1,
+            Op::Call_Native { arity } => -(*arity as isize) + 1,
             Op::Call_Method { arity, .. } => -(*arity as isize), // remember receiver
             Op::Return => -1,
             Op::Closure(_) => 1,

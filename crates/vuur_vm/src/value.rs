@@ -74,6 +74,11 @@ impl fmt::Debug for Value {
 
 impl Value {
     #[inline(always)]
+    pub fn is_nil(&self) -> bool {
+        matches!(self, Value::Nil)
+    }
+
+    #[inline(always)]
     pub fn into_func(self) -> Result<Rc<ScriptFunc>, String> {
         match self {
             Value::Func(func) => Ok(func),
@@ -85,6 +90,14 @@ impl Value {
     pub fn into_closure(self) -> Result<Handle<Closure>, String> {
         match self {
             Value::Closure(closure) => Ok(closure),
+            _ => Err(self.type_error()),
+        }
+    }
+
+    #[inline(always)]
+    pub fn into_native(self) -> Result<Handle<NativeFunc>, String> {
+        match self {
+            Value::Native(native) => Ok(native),
             _ => Err(self.type_error()),
         }
     }
@@ -104,6 +117,27 @@ impl Value {
 
     fn type_error(&self) -> String {
         format!("unexpected value type: {self:?}")
+    }
+
+    pub fn repr(&self) -> ValueRepr {
+        ValueRepr(self)
+    }
+}
+
+pub struct ValueRepr<'a>(&'a Value);
+
+impl<'a> fmt::Display for ValueRepr<'a> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match *self.0 {
+            Value::Nil => write!(f, "nil"),
+            Value::Bool(v) => write!(f, "{v}"),
+            Value::Int(v) => write!(f, "{v}"),
+            Value::Float(v) => write!(f, "{v}"),
+            Value::Str(ref v) => write!(f, "\"{}\"", v.borrow()),
+            Value::Func(_) => write!(f, "function"),
+            Value::Closure(_) => write!(f, "closure"),
+            Value::Native(_) => write!(f, "native function"),
+        }
     }
 }
 
@@ -204,6 +238,13 @@ impl Module {
             vars: SymbolTable::new(),
         }
     }
+
+    pub fn dump_vars(&self) {
+        println!("{} variables:", self.name);
+        for (symbol, var) in self.vars.iter() {
+            println!("     {symbol:?} : {var:?}");
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -292,12 +333,19 @@ pub struct ScriptFunc {
     pub module: Weak<RefCell<Module>>,
 }
 
-pub type NativeFuncPtr = fn() -> ();
+/// Environment passed to native functions to grant
+/// the host access to some virtual machine functions.
+pub struct Env {}
+
+// TODO: Decent error type for VM API.
+pub type NativeFuncPtr = fn(env: Env, args: &[Value]) -> Result<Value, String>;
 
 /// Host function defined in Rust.
 #[derive(Debug)]
 pub struct NativeFunc {
     pub ptr: NativeFuncPtr,
+    pub arity: u8,
+    // TODO: Debug info
 }
 
 #[cfg(test)]
@@ -313,5 +361,18 @@ mod test {
         assert!(std::mem::size_of::<*const [u8; 1024]>() <= std::mem::size_of::<Slot>());
         assert!(std::mem::size_of::<Handle<[u8; 1024]>>() <= std::mem::size_of::<Slot>());
         assert!(std::mem::size_of::<Rc<[u8; 1024]>>() <= std::mem::size_of::<Slot>());
+    }
+
+    #[test]
+    fn test_unsized_boxed() {
+        struct Str<T: ?Sized> {
+            size: usize,
+            data: T,
+        }
+
+        let s: Box<Str<[u8]>> = Box::new(Str {
+            size: 4,
+            data: [1, 2, 3, 4],
+        });
     }
 }

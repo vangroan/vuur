@@ -9,7 +9,7 @@ use crate::handle::Handle;
 use crate::instruction_set::Op;
 use crate::store::Store;
 use crate::symbol_table::{Symbol, SymbolTable};
-use crate::value::{Closure, MethodId, Module, Program, Slot, Value};
+use crate::value::{Closure, Env, MethodId, Module, NativeFuncPtr, Program, Slot, Value};
 
 const ENTRY_POINT: &str = "Main";
 
@@ -60,21 +60,22 @@ impl Fiber {
 
 impl VM {
     pub fn new() -> Self {
-        Self {
-            fiber: None,
-            store: Store {
-                modules: HashMap::new(),
-                methods: SymbolTable::new(),
-            },
-        }
+        Self::from_store(Store {
+            modules: HashMap::new(),
+            methods: SymbolTable::new(),
+        })
+    }
+
+    pub fn from_store(store: Store) -> Self {
+        Self { fiber: None, store }
     }
 
     // #[inline(never)]
     pub fn run_program(&mut self, program: &Program) -> Result<Value, String> {
-        let module = program.module.clone();
+        let _module = program.module.clone();
         let closure = program.closure.clone();
 
-        // Setup a fiber
+        // Set up a fiber
         let fiber = Handle::new(Fiber::new(closure));
 
         let result = run_interpreter(self, fiber)?;
@@ -95,11 +96,11 @@ impl VM {
     }
 
     /// Execute a top-level function inside the given module.
-    pub fn run_module(&mut self, module: Rc<Module>, func_name: &str, args: &[u8]) -> Result<(), String> {
+    pub fn run_module(&mut self, _module: Rc<Module>, _func_name: &str, _args: &[u8]) -> Result<(), String> {
         todo!()
     }
 
-    pub fn resume_fiber(&mut self, fiber: &mut Fiber) -> Result<(), String> {
+    pub fn resume_fiber(&mut self, _fiber: &mut Fiber) -> Result<(), String> {
         todo!()
     }
 }
@@ -129,6 +130,19 @@ enum RunAction {
     /// Call a closure.
     Call {
         closure: Handle<Closure>,
+        // The absolute position in the stack where the
+        // next frame's arguments start.
+        //
+        // Excludes the function object placed on teh stack.
+        stack_offset: usize,
+    },
+    /// Call a native Rust function.
+    CallNative {
+        ptr: NativeFuncPtr,
+        // The absolute position in the stack where the
+        // next frame's arguments start.
+        //
+        // Excludes the function object placed on teh stack.
         stack_offset: usize,
     },
     /// Fiber control action.
@@ -154,6 +168,7 @@ fn run_interpreter(vm: &mut VM, fiber: Handle<Fiber>) -> Result<Value, String> {
     }
 }
 
+#[inline(always)]
 fn run_fiber(vm: &mut VM, fiber: &mut Fiber) -> Result<FiberAction, String> {
     let mut frame = fiber.calls.pop().ok_or_else(|| "fiber has no frames on its callstack")?;
 
@@ -185,11 +200,38 @@ fn run_fiber(vm: &mut VM, fiber: &mut Fiber) -> Result<FiberAction, String> {
                 // Put parent frame back onto call stack.
                 fiber.calls.push(new_frame);
             }
+            RunAction::CallNative { ptr, stack_offset } => {
+                // The VM is not re-entrant, meaning native functions
+                // calling back into the same VM is not supported.
+                //
+                // It would be wasteful to push native frames onto a
+                // heterogeneous call stack and loop again. Instead,
+                // we take a shortcut and simply call native functions
+                // from here, allowing the loop to resume the parent
+                // frame on the next iteration
+                let env = Env {};
+
+                let args = &fiber.stack[stack_offset..];
+                match ptr(env, args) {
+                    Ok(value) => {
+                        // Drop callee stack and closure value.
+                        fiber.stack.truncate(stack_offset - 1);
+                        fiber.stack.push(value); // return result
+                    }
+                    Err(err) => {
+                        return Err(err);
+                    }
+                }
+            }
+            // Special fiber control action.
             RunAction::Fiber(_) => {}
         }
     }
 }
 
+/// Bytecode instruction interpreter loop.
+///
+/// It may seem odd to inline such a large function, but it improves benchmarks ~10%!
 #[inline(always)]
 fn run_op_loop(_vm: &mut VM, fiber: &mut Fiber, frame: &mut CallFrame) -> Result<RunAction, String> {
     let closure = frame.closure.clone();
@@ -207,6 +249,9 @@ fn run_op_loop(_vm: &mut VM, fiber: &mut Fiber, frame: &mut CallFrame) -> Result
             .ok_or_else(|| "bytecode buffer out of bounds")?;
 
         if cfg!(feature = "trace_ops") {
+            for (offset, value) in fiber.stack.iter().enumerate() {
+                println!("     {offset} : {value:?}");
+            }
             println!("{:04} {op:?}", frame.ip);
         }
 
@@ -251,6 +296,14 @@ fn run_op_loop(_vm: &mut VM, fiber: &mut Fiber, frame: &mut CallFrame) -> Result
             Op::I32_LessEq => {
                 let [a, b] = fiber.pop_slots_2();
                 fiber.stack.push(Value::Bool(a.into_i32()? <= b.into_i32()?));
+            }
+            Op::Const(constant_id) => {
+                let constant = func
+                    .constants
+                    .get(constant_id.to_usize())
+                    .cloned()
+                    .ok_or_else(|| "constant not in function definition")?;
+                fiber.stack.push(constant);
             }
             Op::I32_Const_Inline(arg) => {
                 let a = arg.to_i32();
@@ -300,6 +353,17 @@ fn run_op_loop(_vm: &mut VM, fiber: &mut Fiber, frame: &mut CallFrame) -> Result
                 let closure = closure_value.into_closure()?;
                 return Ok(RunAction::Call {
                     closure,
+                    stack_offset: lo,
+                });
+            }
+            Op::Call_Native { arity } => {
+                let lo = fiber.stack.len() - arity as usize;
+                let func_offset = lo - 1;
+                let func_value = fiber.stack.get(func_offset).cloned().ok_or_else(|| "stack underflow")?;
+                let native_func = func_value.into_native()?;
+                let native_ptr = native_func.borrow().ptr.clone();
+                return Ok(RunAction::CallNative {
+                    ptr: native_ptr,
                     stack_offset: lo,
                 });
             }

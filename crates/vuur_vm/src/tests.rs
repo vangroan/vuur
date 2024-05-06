@@ -6,6 +6,8 @@ use crate::{
     vm_v2::VM,
 };
 
+use crate::core::init_core;
+use crate::store::Store;
 use std::rc::Rc;
 use std::time::Instant;
 
@@ -56,10 +58,12 @@ fn fibonacci(module: Handle<Module>) -> Rc<ScriptFunc> {
 }
 
 #[test]
-fn test_vm_v2() {
-    let fib_arg_1 = 10;
+fn test_fibonacci() {
+    let fib_arg_1 = 20;
 
+    let mut store = Store::new();
     let module = Handle::new(Module::new("__main__"));
+    init_core(&mut store, &mut *module.borrow_mut());
 
     // Global variable slots would be determined by top-level `var` and `func` statements.
     for _ in 0..1 {
@@ -100,10 +104,51 @@ fn test_vm_v2() {
     let program = Program::new(module, closure);
 
     // ---------------------------------------------------------------------------------------------
-    let mut vm = VM::new();
+    let mut vm = VM::from_store(store);
     let start = Instant::now();
     let value = vm.run_program(&program);
-    println!("time: {}µs", (Instant::now() - start).as_micros());
+    println!("time: {}ms", (Instant::now() - start).as_millis());
     println!("{value:?}");
-    assert_eq!(value.unwrap().into_i32().unwrap(), 55);
+    assert_eq!(value.unwrap().into_i32().unwrap(), 6765);
+}
+
+#[test]
+fn test_static_call() {
+    let mut store = Store::new();
+    let module = Handle::new(Module::new("__main__"));
+    init_core(&mut store, &mut *module.borrow_mut());
+
+    let code = vec![
+        // print(nil)
+        Op::Load_Global(GlobalId::new(1)), // system_print
+        Op::Const(ConstantId::new(0)),
+        Op::Call_Native { arity: 1 }, // system_print
+        // print(max(7, 11))
+        Op::Load_Global(GlobalId::new(1)), // system_print
+        Op::Load_Global(GlobalId::new(0)), // int32_max
+        Op::I32_Const_Inline(Arg24::from_i32(7)),
+        Op::I32_Const_Inline(Arg24::from_i32(11)),
+        Op::Call_Native { arity: 2 }, // int32_max
+        Op::Call_Native { arity: 1 }, // system_print
+        Op::Pop,
+        // return nil
+        Op::Const(ConstantId::new(0)),
+        Op::Return,
+        Op::End,
+    ];
+
+    // Module top-level code.
+    let func = Rc::new(ScriptFunc {
+        constants: vec![Value::Nil],
+        code: code.into_boxed_slice(),
+        module: module.downgrade(),
+    });
+
+    let closure = Handle::new(Closure::new(func));
+    let program = Program::new(module, closure);
+
+    // ---------------------------------------------------------------------------------------------
+    let mut vm = VM::from_store(store);
+    let value = vm.run_program(&program);
+    assert!(value.unwrap().is_nil());
 }
