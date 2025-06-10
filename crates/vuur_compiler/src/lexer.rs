@@ -2,12 +2,12 @@
 
 use std::ops::Range;
 
-use super::cursor::{Cursor, EOF_CHAR};
-use super::tokens::{Keyword, Token, TokenKind};
+use crate::cursor::{Cursor, EOF_CHAR};
+use crate::tokens::{Keyword, Token, TokenKind};
 use crate::limits::*;
 use crate::span::Span;
 use crate::stack::ArrayStack;
-use crate::tokens::tokens::NumFormat;
+use crate::tokens::NumFormat;
 
 /// Lexical analyser (tokeniser) for the Vuur language.
 pub struct Lexer<'a> {

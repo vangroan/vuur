@@ -1,9 +1,8 @@
 //! Vuur Compiler
-#![deny(rust_2018_idioms)]
 
-mod ast;
-mod bytecode;
 mod error;
+mod cursor;
+mod lexer;
 mod limits;
 mod span;
 mod stack;
@@ -12,7 +11,7 @@ mod tokens;
 
 pub use self::{
     error::{CodeError, ErrorKind, Stage},
+    lexer::Lexer,
     span::Span,
-    tokens::lexer::Lexer,
-    tokens::tokens::{Token, TokenKind},
+    tokens::{Token, TokenKind},
 };

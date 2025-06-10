@@ -20,3 +20,6 @@ vuur_lexer = { path = "../vuur_lexer" }
 vuur_parse = { path = "../vuur_parse" }
 vuur_compile = { path = "../vuur_compile" }
 vuur_vm = { path = "../vuur_vm" }
+
+unicode-width = "0.1"
+static_assertions = "1.1"

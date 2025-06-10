@@ -1,8 +1,16 @@
 //! Read-eval-print loop.
 use std::io::Write;
+
 use vuur_compile::{disassemble, Chunk};
 use vuur_lexer::Lexer;
 use vuur_vm::VM;
+
+mod cursor;
+mod lexer;
+mod limits;
+mod span;
+mod stack;
+mod tokens;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Vuur v{}", env!("CARGO_PKG_VERSION"));
